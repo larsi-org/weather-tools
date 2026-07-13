@@ -11,7 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.TimeZone
 import java.util.zip.GZIPInputStream
 
-import org.larsi.dev.CreateDB
+import org.larsi.util.Icao
 import org.larsi.util.MeteredDataConnector
 import org.larsi.util.PsychrometricsUtil
 
@@ -48,8 +48,8 @@ object IshDatabase
 		for (year in 2020..2020) {
 			println(">>> STARTING UPLOAD YEAR: $year <<<")
 
-			for ((i, entry) in CreateDB.Icao.entries.withIndex()) {
-				val prefix = entry.prefix.lowercase()
+			for ((i, entry) in Icao.entries.withIndex()) {
+				val prefix = entry.name.lowercase()
 				val inName = "$directory$year/${entry.usafWban}-$year.gz"
 
 				if (!File(inName).exists())
@@ -108,7 +108,7 @@ object IshDatabase
 
 					md.addBatch(md.optimizeTable("${prefix}_log"))
 
-					println("${1 + i}/${CreateDB.Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
+					println("${1 + i}/${Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
 					md.executeBatch()
 
 					md.close()
