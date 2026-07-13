@@ -31,19 +31,19 @@ class MeteredDataConnector
 		connect(
 			dataBaseType.className,
 			dataBaseType.buildUrl(properties),
-			if (dataBaseType.useCredentials) properties["user"] else null,
+			if (dataBaseType.useCredentials) properties["username"] else null,
 			if (dataBaseType.useCredentials) properties["password"] else null
 		)
 
 	/**
 	 * Reads the credentials and attempts to make a connection to the correct database.<br></br>
 	 */
-	private fun connect(className: String, url: String, user: String?, password: String?)
+	private fun connect(className: String, url: String, username: String?, password: String?)
 	{
 		LOG.info("Connecting to \"$url\"")
 
 		Class.forName(className)
-		sqlConnection = if (user == null || password == null) DriverManager.getConnection(url) else DriverManager.getConnection(url, user, password)
+		sqlConnection = if (username == null || password == null) DriverManager.getConnection(url) else DriverManager.getConnection(url, username, password)
 		sqlStatement = sqlConnection!!.createStatement()
 	}
 
