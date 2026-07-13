@@ -1,0 +1,6 @@
+target/
+dependency-reduced-pom.xml
+credentials.json
+.idea/
+*.iml
+CLAUDE.md
