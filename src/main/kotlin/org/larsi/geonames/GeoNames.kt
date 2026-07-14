@@ -26,11 +26,13 @@ object GeoNames
 			"dewPoint", // 2 -> 4
 			"humidity", // 3 -> 7
 			"clouds", // 4 -> 10
-			"weatherCondition", // 5 -> 13
-			"seaLevelPressure", // 6 -> 16
-			"windDirection", // 7 -> 19
-			"windSpeed" // 8 -> 22
+			"seaLevelPressure", // 5 -> 16
+			"windDirection", // 6 -> 19
+			"windSpeed" // 7 -> 22
 	)
+
+	/** SensorID for each TAGS entry (index-aligned; index 0/observationTime has none) */
+	val SENSOR_IDS = intArrayOf(-1, 1, 4, 7, 10, 16, 19, 22)
 
 	var url: String? = null
 
@@ -70,10 +72,6 @@ object GeoNames
 				print("$entry - ")
 				val prefix = entry.lowercase()
 				url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
-				// http://api.geonames.org/weatherIcao?username=larsi&ICAO=KROC
-				// https://tgftp.nws.noaa.gov/data/observations/metar/stations/KROC.TXT
-				// https://tgftp.nws.noaa.gov/data/observations/metar/decoded/KROC.TXT
-				// https://tgftp.nws.noaa.gov/data/observations/metar/trend/KROC.TREND
 
 				try {
 					md.clearBatch()
@@ -98,7 +96,7 @@ object GeoNames
 									break
 								}
 								time = (formatter.parse(value).time / 1000).toInt()
-								if (time <= md.getMaxDateTimeLog(prefix, "1,4,7,10,13,16,19,22")) {
+								if (time <= md.getMaxDateTimeLog(prefix, "1,4,7,10,16,19,22")) {
 									println("up to date")
 									break
 								}
@@ -117,10 +115,9 @@ object GeoNames
 												else -> value
 											}
 										}
-										5 -> continue // weather condition (ignored for now)
-										8 -> value = FORMAT_1.format(knotsToMPS * value.toFloat()) // wind speed
+										7 -> value = FORMAT_1.format(knotsToMPS * value.toFloat()) // wind speed
 									}
-									md.addBatch(md.insertLogSQL(prefix, time, 3 * typeID - 2, value))
+									md.addBatch(md.insertLogSQL(prefix, time, SENSOR_IDS[typeID], value))
 								}
 							}
 						}

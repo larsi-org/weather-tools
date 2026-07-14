@@ -23,13 +23,12 @@ object GeoNamesCC
 	val TAGS = arrayOf(
 			"observationTime", // 0 -> n/a
 			"temperature", // 1 -> 0
-			"dewPoint", // 2 -> 2
-			"humidity", // 3 -> 4
-			"seaLevelPressure", // 4 -> 6
-			"windDirection", // 5 -> 8
-			"windSpeed", // 6 -> 10
-			"clouds", // 7 -> 12
-			"weatherCondition" // 8 -> 14
+			"dewPoint", // 2 -> 1
+			"humidity", // 3 -> 2
+			"seaLevelPressure", // 4 -> 3
+			"windDirection", // 5 -> 4
+			"windSpeed", // 6 -> 5
+			"clouds" // 7 -> 6
 	)
 
 	var url: String? = null
@@ -62,7 +61,7 @@ object GeoNamesCC
 			val md = MeteredDataConnector("larsi-weathercc")
 
 			/** Get ICAO entries */
-			val entries = md.queryList("SELECT id, prefix FROM location;") { it.getString(1).uppercase() }
+			val entries = md.queryList("SELECT Prefix FROM location;") { it.getString(1).uppercase() }
 
 			// check all entries
 			println("Checking ${entries.size} Stations...")
@@ -70,9 +69,6 @@ object GeoNamesCC
 				print("$entry - ")
 				val prefix = entry.uppercase()
 				url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
-				// http://weather.noaa.gov/pub/data/observations/metar/stations/KITH.TXT
-				// http://weather.noaa.gov/pub/data/observations/metar/decoded/KROC.TXT
-				// http://weather.noaa.gov/pub/data/observations/metar/trend/KROC.TREND
 
 				try {
 					md.clearBatch()
@@ -87,18 +83,6 @@ object GeoNamesCC
 					if (nl != null && nl.length > 0) {
 						val obs = nl.item(0) as Element
 
-						// nl = obs.getChildNodes();
-						// final StringBuilder sb = new StringBuilder();
-						// for (int i = 0; i < nl.getLength(); i++) {
-						// Node node = nl.item(i);
-						// if (node.getNodeType() == Node.ELEMENT_NODE) {
-						// sb.append(node.getFirstChild().getNodeValue()).append(',');
-						// //System.out.println(node.getNodeName() + "=" +
-						// node.getFirstChild().getNodeValue());
-						// }
-						// }
-						// System.out.println(sb.toString());
-
 						var time = 0
 						for (typeID in TAGS.indices) {
 							var value = getTextValue(obs, TAGS[typeID])
@@ -109,7 +93,7 @@ object GeoNamesCC
 									break
 								}
 								time = (formatter.parse(value).time / 1000).toInt()
-								if (time <= md.getMaxDateTimeLogCC(prefix, "0,2,4,6,8,10,12,14")) {
+								if (time <= md.getMaxDateTimeLogCC(prefix, "0,1,2,3,4,5,6")) {
 									println("up to date")
 									break
 								}
@@ -129,9 +113,8 @@ object GeoNamesCC
 												else -> value
 											}
 										}
-										8 -> continue // weather condition (ignored for now)
 									}
-									md.addBatch(md.insertLogSQLCC(prefix, time, 2 * (typeID - 1), value))
+									md.addBatch(md.insertLogSQLCC(prefix, time, typeID - 1, value))
 								}
 							}
 						}

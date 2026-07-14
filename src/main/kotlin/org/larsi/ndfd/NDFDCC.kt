@@ -22,12 +22,12 @@ class NDFDCC
 		const val SENSOR_CNT = 6
 
 		val sensorIDs = intArrayOf( // SENSOR_CNT
-			1,  // ICAO Temperature (predicted)
-			3,  // ICAO Dew Point Temperature (predicted)
-			11, // ICAO Wind Speed (predicted)
-			9,  // ICAO Wind Direction (predicted)
-			13, // ICAO Clouds (predicted)
-			5,  // ICAO Humidity (predicted)
+			16, // ICAO Temperature (predicted)
+			17, // ICAO Dew Point Temperature (predicted)
+			21, // ICAO Wind Speed (predicted)
+			20, // ICAO Wind Direction (predicted)
+			22, // ICAO Clouds (predicted)
+			18, // ICAO Humidity (predicted)
 		)
 
 		// local variables used in search
@@ -213,7 +213,7 @@ class NDFDCC
 					md.addBatch(md.emptyLogSQLCC(prefix, sensorIDs[j]))
 					val v = values[j]
 					val t = times[j]
-					val lastCurrent = md.getMaxDateTimeLogCC(prefix, sensorIDs[j] - 1)
+					val lastCurrent = md.getMaxDateTimeLogCC(prefix, sensorIDs[j] - 16)
 					if (prefix.startsWith("K")) {
 						val cnt = if (v.size < t.size) v.size else t.size
 						for (i in 0 until cnt) {

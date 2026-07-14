@@ -25,6 +25,24 @@ Each of `geonames`/`ndfd`/`zeus` also has a "CC" counterpart (`GeoNamesCC`, `NDF
 that targets an alternate multi-tenant database schema. These are not currently used by the live
 site.
 
+## Sensor IDs
+
+Each stored quantity is identified by a numeric sensor ID, which differs between the live schema
+and the CC schema, and between measured and predicted values:
+
+| Quantity | Measured (GeoNamesCC/IshCC) | Predicted (NDFDCC) | Measured (GeoNames/Ish) | Predicted (NDFD) |
+|---|---|---|---|---|
+| Temperature | 0 | 16 | 1 | 2 |
+| Dew Point | 1 | 17 | 4 | 5 |
+| Humidity | 2 | 18 | 7 | 8 |
+| Sea Level Pressure | 3 | — | 16 | — |
+| Wind Direction | 4 | 20 | 19 | 20 |
+| Wind Speed | 5 | 21 | 22 | 23 |
+| Clouds | 6 | 22 | 10 | 11 |
+
+Pressure has no predicted counterpart in either schema (NDFD doesn't forecast it). The live schema
+derives predicted IDs as `measured + 1`; the CC schema uses `measured + 16`.
+
 ## Requirements
 
 - JDK 11+

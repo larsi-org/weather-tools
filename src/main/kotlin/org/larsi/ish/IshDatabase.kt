@@ -4,7 +4,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.nio.charset.Charset
-
 import java.text.DateFormat
 import java.text.ParseException
 import java.text.SimpleDateFormat
@@ -48,7 +47,7 @@ object IshDatabase
 		for (year in 2020..2020) {
 			println(">>> STARTING UPLOAD YEAR: $year <<<")
 
-			for ((i, entry) in Icao.entries.withIndex()) {
+			for ((idx, entry) in Icao.entries.withIndex()) {
 				val prefix = entry.name.lowercase()
 				val inName = "$directory$year/${entry.usafWban}-$year.gz"
 
@@ -108,7 +107,7 @@ object IshDatabase
 
 					md.addBatch(md.optimizeTable("${prefix}_log"))
 
-					println("${1 + i}/${Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
+					println("${1 + idx}/${Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
 					md.executeBatch()
 
 					md.close()
