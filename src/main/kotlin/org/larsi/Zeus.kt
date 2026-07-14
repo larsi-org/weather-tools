@@ -1,4 +1,4 @@
-package org.larsi.zeus
+package org.larsi
 
 import java.util.Date
 

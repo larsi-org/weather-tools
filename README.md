@@ -5,43 +5,47 @@ feeding a MySQL-backed weather website.
 
 ## What's here
 
-Package root `org.larsi`:
+Package root `org.larsi`. Most tools live directly in that package (one or two files each, not
+worth their own subdirectory); `dev/` and `util/` are the exceptions since they hold several files
+each:
 
-- **`geonames/`** — polls the [GeoNames](https://www.geonames.org/) weather API for METAR-derived
-  observations (temperature, dew point, humidity, clouds, pressure, wind) per weather station, and
-  stores them in MySQL. This is the live, currently-deployed data source.
-- **`ndfd/`** — supplements measured observations with [NOAA NDFD](https://graphical.weather.gov/)
-  forecast data via SOAP. Written but not currently deployed.
-- **`ish/`** — a manual backfill tool that downloads NOAA's historical "ISH" (Integrated Surface
-  Hourly) archive and re-imports it, to patch gaps left by harvester downtime.
-- **`zeus/`** — a monitoring job that tracks per-sensor data freshness and flags stations that have
-  stopped reporting.
+- **`GeoNames2.kt`** — polls the [GeoNames](https://www.geonames.org/) weather API for
+  METAR-derived observations (temperature, dew point, humidity, clouds, pressure, wind) per weather
+  station, and stores them in MySQL (`larsi-weather2`). This is the live, currently-deployed data
+  source.
+- **`NDFD2.kt`** — supplements measured observations with
+  [NOAA NDFD](https://graphical.weather.gov/) forecast data via SOAP. Written but not currently
+  deployed.
+- **`Ish2.kt`** (plus `IshHarvester.kt`) — a manual backfill tool that downloads NOAA's
+  historical "ISH" (Integrated Surface Hourly) archive and re-imports it, to patch gaps left by
+  harvester downtime.
+- **`Zeus.kt`** — a monitoring job that tracks per-sensor data freshness and flags stations that
+  have stopped reporting.
 - **`dev/`** — assorted one-off developer utilities (station-list generation, data export/import,
   etc.).
 - **`util/`** — shared helpers: config loading, a JDBC connection/query helper, and psychrometric
   calculations.
 
-Each of `geonames`/`ndfd`/`zeus` also has a "2" counterpart (`GeoNames2`, `NDFD2`, `Ish2`)
-that targets an alternate multi-tenant database schema (`larsi-weather2`), a prospective successor
-to the live per-station schema. These are not currently used by the live site.
+The `2` suffix on `GeoNames2`/`NDFD2`/`Ish2` is a naming artifact from when `larsi-weather2` was a
+prospective successor schema developed alongside the original, now-retired `GeoNames`/`NDFD`/`Ish`
+tools (which targeted the old per-station-table `larsi-weather` schema). That migration is
+complete — `larsi-weather2` is now the live schema and the old tools/schema have been removed.
 
 ## Sensor IDs
 
-Each stored quantity is identified by a numeric sensor ID, which differs between the live schema
-and the `larsi-weather2` schema, and between measured and predicted values:
+Each stored quantity is identified by a numeric sensor ID:
 
-| Quantity | Measured (GeoNames2/Ish2) | Predicted (NDFD2) | Measured (GeoNames/Ish) | Predicted (NDFD) |
-|---|---|---|---|---|
-| Temperature | 0 | 16 | 1 | 2 |
-| Dew Point | 1 | 17 | 4 | 5 |
-| Humidity | 2 | 18 | 7 | 8 |
-| Sea Level Pressure | 3 | — | 16 | — |
-| Wind Direction | 4 | 20 | 19 | 20 |
-| Wind Speed | 5 | 21 | 22 | 23 |
-| Clouds | 6 | 22 | 10 | 11 |
+| Quantity | Measured (GeoNames2/Ish2) | Predicted (NDFD2) |
+|---|---|---|
+| Temperature | 0 | 16 |
+| Dew Point | 1 | 17 |
+| Humidity | 2 | 18 |
+| Sea Level Pressure | 3 | — |
+| Wind Direction | 4 | 20 |
+| Wind Speed | 5 | 21 |
+| Clouds | 6 | 22 |
 
-Pressure has no predicted counterpart in either schema (NDFD doesn't forecast it). The live schema
-derives predicted IDs as `measured + 1`; the `larsi-weather2` schema uses `measured + 16`.
+Pressure has no predicted counterpart (NDFD doesn't forecast it). Predicted IDs are `measured + 16`.
 
 ## Requirements
 
@@ -59,15 +63,15 @@ This produces three runnable jars in `target/`, each bundling the full project p
 
 | Jar | Runs |
 |---|---|
-| `target/geonames.jar` | `org.larsi.geonames.GeoNames` |
-| `target/ndfd.jar` | `org.larsi.ndfd.NDFD` |
-| `target/zeus.jar` | `org.larsi.zeus.Zeus` |
+| `target/geonames.jar` | `org.larsi.GeoNames2` |
+| `target/ndfd.jar` | `org.larsi.NDFD2` |
+| `target/zeus.jar` | `org.larsi.Zeus` |
 
-`ish/`'s two entry points (`org.larsi.ish.IshHarvester`, `org.larsi.ish.Ish`) aren't
+`ish/`'s two entry points (`org.larsi.IshHarvester`, `org.larsi.Ish2`) aren't
 packaged into a standalone jar; run them via the classpath instead:
 
 ```sh
-java -cp target/weather-tools-1.0-SNAPSHOT.jar:$(mvn -q dependency:build-classpath -Dmdep.outputFile=/dev/stdout) org.larsi.ish.IshHarvester
+java -cp target/weather-tools-1.0-SNAPSHOT.jar:$(mvn -q dependency:build-classpath -Dmdep.outputFile=/dev/stdout) org.larsi.IshHarvester
 ```
 
 ## Configuration

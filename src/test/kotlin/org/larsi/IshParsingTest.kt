@@ -1,4 +1,4 @@
-package org.larsi.ish
+package org.larsi
 
 import java.util.TimeZone
 
@@ -7,8 +7,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * Covers Ish's pure fixed-width NOAA ISH parsing logic (getCDS/getMDS/getGF1) — no file
- * I/O, network, or database involved. Ish is a Kotlin object with shared mutable state,
+ * Covers Ish2's pure fixed-width NOAA ISH parsing logic (getCDS/getMDS/getGF1) — no file
+ * I/O, network, or database involved. Ish2 is a Kotlin object with shared mutable state,
  * so [setGmt] re-pins the timezone main() normally sets before any real run, and the GF1 tests
  * set iREM_IndexOf explicitly rather than relying on process()'s side effect, so tests don't
  * depend on execution order.
@@ -17,7 +17,7 @@ class IshParsingTest
 {
 	@BeforeEach
 	fun setGmt() {
-		Ish.formatter.timeZone = TimeZone.getTimeZone("GMT")
+		Ish2.formatter.timeZone = TimeZone.getTimeZone("GMT")
 	}
 
 	// Builds a Mandatory Data Section test record: 104 filler chars with the fields getMDS
@@ -55,142 +55,142 @@ class IshParsingTest
 
 	private fun setRemIndexFor(line: String) {
 		val idx = line.indexOf("REM")
-		Ish.iREM_IndexOf = if (idx == -1) 9999 else idx
+		Ish2.iREM_IndexOf = if (idx == -1) 9999 else idx
 	}
 
 	@Test
 	fun `getCDS parses a GMT timestamp to epoch seconds`() {
-		Ish.getCDS("0".repeat(15) + "202001010000" + "0".repeat(78))
-		assertEquals(1577836800, Ish.utc) // 2020-01-01 00:00:00 UTC
+		Ish2.getCDS("0".repeat(15) + "202001010000" + "0".repeat(78))
+		assertEquals(1577836800, Ish2.utc) // 2020-01-01 00:00:00 UTC
 
-		Ish.getCDS("0".repeat(15) + "202001010053" + "0".repeat(78))
-		assertEquals(1577839980, Ish.utc) // 2020-01-01 00:53:00 UTC
+		Ish2.getCDS("0".repeat(15) + "202001010053" + "0".repeat(78))
+		assertEquals(1577839980, Ish2.utc) // 2020-01-01 00:53:00 UTC
 	}
 
 	@Test
 	fun `getMDS treats all sentinel values as missing`() {
-		Ish.getMDS(mdsLine())
-		assertEquals("***", Ish.sMDS_Dir)
-		assertEquals("****", Ish.sMDS_Spd)
-		assertEquals("****", Ish.sMDS_Temp)
-		assertEquals("****", Ish.sMDS_Dewp)
-		assertEquals("******", Ish.sMDS_Slp)
+		Ish2.getMDS(mdsLine())
+		assertEquals("***", Ish2.sMDS_Dir)
+		assertEquals("****", Ish2.sMDS_Spd)
+		assertEquals("****", Ish2.sMDS_Temp)
+		assertEquals("****", Ish2.sMDS_Dewp)
+		assertEquals("******", Ish2.sMDS_Slp)
 	}
 
 	@Test
 	fun `getMDS passes through a real wind direction unchanged`() {
-		Ish.getMDS(mdsLine(dir = "340"))
-		assertEquals("340", Ish.sMDS_Dir)
+		Ish2.getMDS(mdsLine(dir = "340"))
+		assertEquals("340", Ish2.sMDS_Dir)
 	}
 
 	@Test
 	fun `getMDS converts wind speed from tenths of meters per second`() {
-		Ish.getMDS(mdsLine(spd = "0021"))
-		assertEquals("2.1", Ish.sMDS_Spd)
+		Ish2.getMDS(mdsLine(spd = "0021"))
+		assertEquals("2.1", Ish2.sMDS_Spd)
 	}
 
 	@Test
 	fun `getMDS converts a positive temperature from tenths of a degree`() {
-		Ish.getMDS(mdsLine(tempSign = "+", temp = "0233"))
-		assertEquals("23.3", Ish.sMDS_Temp)
+		Ish2.getMDS(mdsLine(tempSign = "+", temp = "0233"))
+		assertEquals("23.3", Ish2.sMDS_Temp)
 	}
 
 	@Test
 	fun `getMDS applies the sign for a negative temperature`() {
-		Ish.getMDS(mdsLine(tempSign = "-", temp = "0050"))
-		assertEquals("-5.0", Ish.sMDS_Temp)
+		Ish2.getMDS(mdsLine(tempSign = "-", temp = "0050"))
+		assertEquals("-5.0", Ish2.sMDS_Temp)
 	}
 
 	@Test
 	fun `getMDS applies the sign for a negative dew point`() {
-		Ish.getMDS(mdsLine(dewpSign = "-", dewp = "0011"))
-		assertEquals("-1.1", Ish.sMDS_Dewp)
+		Ish2.getMDS(mdsLine(dewpSign = "-", dewp = "0011"))
+		assertEquals("-1.1", Ish2.sMDS_Dewp)
 	}
 
 	@Test
 	fun `getMDS converts sea level pressure from tenths of a hectopascal`() {
-		Ish.getMDS(mdsLine(slp = "10171"))
-		assertEquals("1017.1", Ish.sMDS_Slp)
+		Ish2.getMDS(mdsLine(slp = "10171"))
+		assertEquals("1017.1", Ish2.sMDS_Slp)
 	}
 
 	@Test
 	fun `getGF1 defaults to missing when no GF1 element is present`() {
 		val line = "xxxxxxxxxxxxxxxxxxxx"
 		setRemIndexFor(line)
-		Ish.getGF1(line)
-		assertEquals("**", Ish.sGF1_Skc)
+		Ish2.getGF1(line)
+		assertEquals("**", Ish2.sGF1_Skc)
 	}
 
 	@Test
 	fun `getGF1 treats sky-cover sentinel 99 as missing`() {
 		val line = gf1Line(skc = "99")
 		setRemIndexFor(line)
-		Ish.getGF1(line)
-		assertEquals("**", Ish.sGF1_Skc)
+		Ish2.getGF1(line)
+		assertEquals("**", Ish2.sGF1_Skc)
 	}
 
 	@Test
 	fun `getGF1 passes through sky-cover codes below 8`() {
 		val line = gf1Line(skc = "02")
 		setRemIndexFor(line)
-		Ish.getGF1(line)
-		assertEquals("2", Ish.sGF1_Skc)
+		Ish2.getGF1(line)
+		assertEquals("2", Ish2.sGF1_Skc)
 	}
 
 	@Test
 	fun `getGF1 maps sky-cover code 8 to 10 (obscured)`() {
 		val line = gf1Line(skc = "08")
 		setRemIndexFor(line)
-		Ish.getGF1(line)
-		assertEquals("10", Ish.sGF1_Skc)
+		Ish2.getGF1(line)
+		assertEquals("10", Ish2.sGF1_Skc)
 	}
 
 	@Test
 	fun `getGF1 maps sky-cover codes above 8 to missing`() {
 		val line = gf1Line(skc = "09")
 		setRemIndexFor(line)
-		Ish.getGF1(line)
-		assertEquals("**", Ish.sGF1_Skc)
+		Ish2.getGF1(line)
+		assertEquals("**", Ish2.sGF1_Skc)
 	}
 
 	@Test
 	fun `getGF1 ignores a GF1 element that appears after the REM marker`() {
 		val line = gf1Line(skc = "02", withRemBefore = true)
 		setRemIndexFor(line)
-		Ish.getGF1(line)
-		assertEquals("**", Ish.sGF1_Skc)
+		Ish2.getGF1(line)
+		assertEquals("**", Ish2.sGF1_Skc)
 	}
 
-	// Real records from KMIA (station 722020-12839, 2020-01-01), used earlier to verify the
-	// Ish/Ish2 simplification was behavior-preserving — kept here as permanent
+	// Real records from KMIA (station 722020-12839, 2020-01-01), used earlier to verify a
+	// batching-strategy simplification was behavior-preserving — kept here as permanent
 	// regression anchors for process()'s end-to-end wiring of getCDS/getMDS/getGF1.
 	@Test
 	fun `process parses a real synoptic (SYN) record`() {
 		val line = "0211722020128392020010100004+25750-080383FM-12+000599999V0203401N002112200019N016000199+02331+01671101711ADDGA1999+008001999GE19MSL   +99999+99999GF102991999999008001999999KA1120M+02721KA2120N+02111MA1999999101631MD1310121+9999REMSYN08072202 32566 23404 10233 20167 30163 40171 53012 92353 333 10272 20211 555 90100="
 
-		Ish.process(line)
+		Ish2.process(line)
 
-		assertEquals(1577836800, Ish.utc) // 2020-01-01 00:00:00 UTC
-		assertEquals("23.3", Ish.sMDS_Temp)
-		assertEquals("16.7", Ish.sMDS_Dewp)
-		assertEquals("2", Ish.sGF1_Skc)
-		assertEquals("1017.1", Ish.sMDS_Slp)
-		assertEquals("340", Ish.sMDS_Dir)
-		assertEquals("2.1", Ish.sMDS_Spd)
+		assertEquals(1577836800, Ish2.utc) // 2020-01-01 00:00:00 UTC
+		assertEquals("23.3", Ish2.sMDS_Temp)
+		assertEquals("16.7", Ish2.sMDS_Dewp)
+		assertEquals("2", Ish2.sGF1_Skc)
+		assertEquals("1017.1", Ish2.sMDS_Slp)
+		assertEquals("340", Ish2.sMDS_Dir)
+		assertEquals("2.1", Ish2.sMDS_Spd)
 	}
 
 	@Test
 	fun `process parses a real calm-wind METAR record`() {
 		val line = "0235722020128392020010100537+25788-080317FM-15+0009KMIA V0309999C000052200059N0160935N5+02285+01505101785ADDAA101000095GA1025+007625999GD11991+0076259GE19AGL   +99999+99999GF102995999999007621999999MA1101795101695REMMET09912/31/19 19:53:03 METAR KMIA 010053Z 00000KT 10SM FEW025 23/15 A3006 RMK AO2 SLP178 T02280150 (RDR)EQDD01      0ADE726"
 
-		Ish.process(line)
+		Ish2.process(line)
 
-		assertEquals(1577839980, Ish.utc) // 2020-01-01 00:53:00 UTC
-		assertEquals("22.8", Ish.sMDS_Temp)
-		assertEquals("15.0", Ish.sMDS_Dewp)
-		assertEquals("2", Ish.sGF1_Skc)
-		assertEquals("1017.8", Ish.sMDS_Slp)
-		assertEquals("***", Ish.sMDS_Dir) // calm wind (00000KT) reports as the 999 sentinel
-		assertEquals("0.0", Ish.sMDS_Spd)
+		assertEquals(1577839980, Ish2.utc) // 2020-01-01 00:53:00 UTC
+		assertEquals("22.8", Ish2.sMDS_Temp)
+		assertEquals("15.0", Ish2.sMDS_Dewp)
+		assertEquals("2", Ish2.sGF1_Skc)
+		assertEquals("1017.8", Ish2.sMDS_Slp)
+		assertEquals("***", Ish2.sMDS_Dir) // calm wind (00000KT) reports as the 999 sentinel
+		assertEquals("0.0", Ish2.sMDS_Spd)
 	}
 }

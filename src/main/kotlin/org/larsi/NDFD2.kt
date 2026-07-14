@@ -1,4 +1,4 @@
-package org.larsi.ndfd
+package org.larsi
 
 import java.net.URL
 import java.sql.SQLException

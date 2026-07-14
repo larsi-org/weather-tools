@@ -1,4 +1,4 @@
-package org.larsi.geonames
+package org.larsi
 
 import java.net.URL
 import java.text.DateFormat
@@ -17,22 +17,19 @@ import org.w3c.dom.Element
 
 import org.larsi.util.MeteredDataConnector
 
-object GeoNames
+object GeoNames2
 {
 	/** XML tags that get reported */
 	val TAGS = arrayOf(
 			"observationTime", // 0 -> n/a
-			"temperature", // 1 -> 1
-			"dewPoint", // 2 -> 4
-			"humidity", // 3 -> 7
-			"clouds", // 4 -> 10
-			"seaLevelPressure", // 5 -> 16
-			"windDirection", // 6 -> 19
-			"windSpeed" // 7 -> 22
+			"temperature", // 1 -> 0
+			"dewPoint", // 2 -> 1
+			"humidity", // 3 -> 2
+			"seaLevelPressure", // 4 -> 3
+			"windDirection", // 5 -> 4
+			"windSpeed", // 6 -> 5
+			"clouds" // 7 -> 6
 	)
-
-	/** SensorID for each TAGS entry (index-aligned; index 0/observationTime has none) */
-	val SENSOR_IDS = intArrayOf(-1, 1, 4, 7, 10, 16, 19, 22)
 
 	var url: String? = null
 
@@ -61,7 +58,7 @@ object GeoNames
 		val FORMAT_1: NumberFormat = DecimalFormat("0.0")
 
 		try {
-			val md = MeteredDataConnector("larsi-weather")
+			val md = MeteredDataConnector("larsi-weather2")
 
 			/** Get ICAO entries */
 			val entries = md.queryList("SELECT Prefix FROM location;") { it.getString(1).uppercase() }
@@ -70,7 +67,7 @@ object GeoNames
 			println("Checking ${entries.size} Stations...")
 			for (entry in entries) {
 				print("$entry - ")
-				val prefix = entry.lowercase()
+				val prefix = entry.uppercase()
 				url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
 
 				try {
@@ -96,7 +93,7 @@ object GeoNames
 									break
 								}
 								time = (formatter.parse(value).time / 1000).toInt()
-								if (time <= md.getMaxDateTimeLog(prefix, "1,4,7,10,16,19,22")) {
+								if (time <= md.getMaxDateTimeLog2(prefix, "0,1,2,3,4,5,6")) {
 									println("up to date")
 									break
 								}
@@ -104,7 +101,8 @@ object GeoNames
 							} else {
 								if (value != null) {
 									when (typeID) {
-										4 -> { // clouds
+										6 -> value = FORMAT_1.format(knotsToMPS * value.toFloat()) // wind speed
+										7 -> { // clouds
 											value = value.lowercase()
 											value = when (value) {
 												"n/a" -> "0"
@@ -115,9 +113,8 @@ object GeoNames
 												else -> value
 											}
 										}
-										7 -> value = FORMAT_1.format(knotsToMPS * value.toFloat()) // wind speed
 									}
-									md.addBatch(md.insertLogSQL(prefix, time, SENSOR_IDS[typeID], value))
+									md.addBatch(md.insertLogSQL2(prefix, time, typeID - 1, value))
 								}
 							}
 						}

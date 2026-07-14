@@ -1,4 +1,4 @@
-package org.larsi.ish
+package org.larsi
 
 import java.io.File
 import java.io.FileInputStream
@@ -14,7 +14,7 @@ import org.larsi.util.Icao
 import org.larsi.util.MeteredDataConnector
 import org.larsi.util.PsychrometricsUtil
 
-object Ish
+object Ish2
 {
 	var iWork: Int = 0
 
@@ -46,7 +46,7 @@ object Ish
 			println(">>> STARTING UPLOAD YEAR: $year <<<")
 
 			for ((idx, entry) in Icao.entries.withIndex()) {
-				val prefix = entry.name.lowercase()
+				val prefix = entry.name.uppercase()
 				val inName = "${IshHarvester.directory}$year/${entry.usafWban}-$year.gz"
 
 				if (!File(inName).exists())
@@ -61,49 +61,49 @@ object Ish
 					process(lines[lines.size - 1])
 					val utcEnd = utc
 
-					val md = MeteredDataConnector("larsi-weather")
+					val md = MeteredDataConnector("larsi-weather2")
 					md.clearBatch()
 
-					md.addBatch(md.cleanLogSQL(prefix, "1,4,7,10,13,16,19,22", utcStart, utcEnd))
+					md.addBatch(md.cleanLogSQL2(prefix, "0,1,2,3,4,5,6,7", utcStart, utcEnd))
 
 					val sb = StringBuilder()
-					sb.append("INSERT INTO ").append(prefix).append("_log (DateTime,SensorID,Value) VALUES ")
+					sb.append("INSERT INTO log (epoch,station,sensor_id,value) VALUES ")
 					var rows = 0
 					for (line in lines) {
 						process(line)
 
-						// 1 Temperature
+						// 0 Temperature
 						if (sMDS_Temp != "****")
-							insertLog(sb, ++rows, utc, 1, sMDS_Temp)
+							insertLog(sb, ++rows, prefix, utc, 0, sMDS_Temp)
 
-						// 4 Dew Point
+						// 1 Dew Point
 						if (sMDS_Dewp != "****")
-							insertLog(sb, ++rows, utc, 4, sMDS_Dewp)
+							insertLog(sb, ++rows, prefix, utc, 1, sMDS_Dewp)
 
-						// 7 Humidity
+						// 2 Humidity
 						if (sMDS_Temp != "****" && sMDS_Dewp != "****")
-							insertLog(sb, ++rows, utc, 7,
+							insertLog(sb, ++rows, prefix, utc, 2,
 									PsychrometricsUtil.getRH(sMDS_Temp.toFloat(), sMDS_Dewp.toFloat()))
 
-						// 10 Clouds
-						if (sGF1_Skc != "**")
-							insertLog(sb, ++rows, utc, 10, sGF1_Skc)
-
-						// 16 Pressure
+						// 3 Pressure
 						if (sMDS_Slp != "******")
-							insertLog(sb, ++rows, utc, 16, sMDS_Slp)
+							insertLog(sb, ++rows, prefix, utc, 3, sMDS_Slp)
 
-						// 19 Wind Direction
+						// 4 Wind Direction
 						if (sMDS_Dir != "***")
-							insertLog(sb, ++rows, utc, 19, sMDS_Dir.toInt())
+							insertLog(sb, ++rows, prefix, utc, 4, sMDS_Dir.toInt())
 
-						// 22 Wind Speed
+						// 5 Wind Speed
 						if (sMDS_Spd != "****")
-							insertLog(sb, ++rows, utc, 22, sMDS_Spd)
+							insertLog(sb, ++rows, prefix, utc, 5, sMDS_Spd)
+
+						// 6 Clouds
+						if (sGF1_Skc != "**")
+							insertLog(sb, ++rows, prefix, utc, 6, sGF1_Skc)
 					} // while read
 					md.addBatch(sb.toString())
 
-					md.addBatch(md.optimizeTable("${prefix}_log"))
+					md.addBatch(md.optimizeTable("log"))
 
 					println("${1 + idx}/${Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
 					md.executeBatch()
@@ -225,10 +225,10 @@ fun process(line: String) {
 		}
 	} // End of getGF1
 
-	fun insertLog(sb: StringBuilder, rows: Int, dateTime: Int, sensorID: Int, value: Any) {
+	fun insertLog(sb: StringBuilder, rows: Int, prefix: String, dateTime: Int, sensorID: Int, value: Any) {
 		if (rows != 1)
 			sb.append(',')
-		sb.append('(').append(dateTime).append(',').append(sensorID).append(",'").append(value).append("')")
+		sb.append('(').append(dateTime).append(",'").append(prefix).append("',").append(sensorID).append(",'").append(value).append("')")
 	}
 
 }

@@ -115,8 +115,8 @@
 				shades the whole project (all classes + all dependencies) into its own
 				named jar, differing only in which Main-Class the manifest points at.
 				(ish/ has no execution here - it has two manually-run entry points,
-				IshHarvester/IshDatabase, rather than one canonical Main-Class; run it via
-				`java -cp target/weather-tools-1.0-SNAPSHOT.jar org.larsi.ish.IshHarvester`.)
+				IshHarvester/Ish2, rather than one canonical Main-Class; run it via
+				`java -cp target/weather-tools-1.0-SNAPSHOT.jar org.larsi.IshHarvester`.)
 			-->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -133,7 +133,7 @@
 							<outputFile>${project.build.directory}/geonames.jar</outputFile>
 							<transformers>
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>org.larsi.geonames.GeoNames</mainClass>
+									<mainClass>org.larsi.GeoNames2</mainClass>
 								</transformer>
 							</transformers>
 						</configuration>
@@ -148,7 +148,7 @@
 							<outputFile>${project.build.directory}/ndfd.jar</outputFile>
 							<transformers>
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>org.larsi.ndfd.NDFD</mainClass>
+									<mainClass>org.larsi.NDFD2</mainClass>
 								</transformer>
 							</transformers>
 						</configuration>
@@ -163,7 +163,7 @@
 							<outputFile>${project.build.directory}/zeus.jar</outputFile>
 							<transformers>
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>org.larsi.zeus.Zeus</mainClass>
+									<mainClass>org.larsi.Zeus</mainClass>
 								</transformer>
 							</transformers>
 						</configuration>

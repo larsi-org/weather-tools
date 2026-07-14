@@ -1,4 +1,4 @@
-package org.larsi.ish
+package org.larsi
 
 import java.io.File
 import java.io.FileNotFoundException
