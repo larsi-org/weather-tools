@@ -9,37 +9,49 @@ import java.util.logging.Logger
 
 class MeteredDataConnector
 {
+	enum class DataBaseType(
+		val className: String,
+		val buildUrl: (host: String, db: String) -> String)
+	{
+		MySQL(
+	        className = "com.mysql.cj.jdbc.Driver",
+	        buildUrl = { host, db -> "jdbc:mysql://$host/$db?allowMultiQueries=true" }),
+		Postgres(
+	        className = "org.postgresql.Driver",
+	        buildUrl = { host, db -> "jdbc:postgresql://$host/$db" })
+	}
+
 	companion object {
 		private val LOG = Logger.getLogger(MeteredDataConnector::class.java.name)
+
+		val DATA_BASE_TYPE = DataBaseType.MySQL
 	}
 
 	private var sqlConnection: Connection? = null
 
 	private var sqlStatement: Statement? = null
 
-	constructor(credentials: Map<String, String>, dataBaseType: DataBaseType = DataBaseType.MySQL)
-	{
-		connect(dataBaseType, credentials)
+	constructor(db: String) {
+		connect(db)
 	}
 
-	constructor(db: String, dataBaseType: DataBaseType = DataBaseType.MySQL) : this(WeatherToolsConfig.database!!.plus("db" to db), dataBaseType)
-
 	/**
 	 * Reads the credentials and attempts to make a connection to the correct database.<br></br>
 	 */
-	private fun connect(dataBaseType: DataBaseType, properties: Map<String, String>) =
+	private fun connect(db: String) {
+		val credentials = WeatherToolsConfig.database!!
 		connect(
-			dataBaseType.className,
-			dataBaseType.buildUrl(properties),
-			if (dataBaseType.useCredentials) properties["username"] else null,
-			if (dataBaseType.useCredentials) properties["password"] else null
+			DATA_BASE_TYPE.className,
+			DATA_BASE_TYPE.buildUrl(credentials["host"]!!, db),
+			credentials["username"],
+			credentials["password"]
 		)
+	}
 
 	/**
 	 * Reads the credentials and attempts to make a connection to the correct database.<br></br>
 	 */
-	private fun connect(className: String, url: String, username: String?, password: String?)
-	{
+	private fun connect(className: String, url: String, username: String?, password: String?) {
 		LOG.info("Connecting to \"$url\"")
 
 		Class.forName(className)

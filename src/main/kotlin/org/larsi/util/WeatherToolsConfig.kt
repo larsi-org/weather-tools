@@ -8,8 +8,6 @@ import com.google.gson.JsonObject
 
 object WeatherToolsConfig
 {
-	const val SQLITE_FILE = "data.sqlite"
-
 	private const val CREDENTIALS = "credentials.json"
 	private val GSON = Gson()
 
