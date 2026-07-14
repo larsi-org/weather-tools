@@ -162,7 +162,7 @@ class IshDatabaseParsingTest
 	}
 
 	// Real records from KMIA (station 722020-12839, 2020-01-01), used earlier to verify the
-	// IshDatabase/IshCC simplification was behavior-preserving — kept here as permanent
+	// IshDatabase/Ish2 simplification was behavior-preserving — kept here as permanent
 	// regression anchors for process()'s end-to-end wiring of getCDS/getMDS/getGF1.
 	@Test
 	fun `process parses a real synoptic (SYN) record`() {

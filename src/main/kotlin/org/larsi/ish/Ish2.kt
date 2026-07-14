@@ -14,7 +14,7 @@ import org.larsi.util.Icao
 import org.larsi.util.MeteredDataConnector
 import org.larsi.util.PsychrometricsUtil
 
-object IshCC
+object Ish2
 {
 	val directory: String = "${System.getProperty("user.home")}/Desktop/noaa/"
 
@@ -63,10 +63,10 @@ object IshCC
 					process(lines[lines.size - 1])
 					val utcEnd = utc
 
-					val md = MeteredDataConnector("larsi-weathercc")
+					val md = MeteredDataConnector("larsi-weather2")
 					md.clearBatch()
 
-					md.addBatch(md.cleanLogSQLCC(prefix, "0,1,2,3,4,5,6,7", utcStart, utcEnd))
+					md.addBatch(md.cleanLogSQL2(prefix, "0,1,2,3,4,5,6,7", utcStart, utcEnd))
 
 					val sb = StringBuilder()
 					sb.append("INSERT INTO log (epoch,station,sensor_id,value) VALUES ")

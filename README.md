@@ -21,16 +21,16 @@ Package root `org.larsi`:
 - **`util/`** — shared helpers: config loading, a JDBC connection/query helper, and psychrometric
   calculations.
 
-Each of `geonames`/`ndfd`/`zeus` also has a "CC" counterpart (`GeoNamesCC`, `NDFDCC`, `IshCC`)
-that targets an alternate multi-tenant database schema. These are not currently used by the live
-site.
+Each of `geonames`/`ndfd`/`zeus` also has a "2" counterpart (`GeoNames2`, `NDFD2`, `Ish2`)
+that targets an alternate multi-tenant database schema (`larsi-weather2`), a prospective successor
+to the live per-station schema. These are not currently used by the live site.
 
 ## Sensor IDs
 
 Each stored quantity is identified by a numeric sensor ID, which differs between the live schema
-and the CC schema, and between measured and predicted values:
+and the `larsi-weather2` schema, and between measured and predicted values:
 
-| Quantity | Measured (GeoNamesCC/IshCC) | Predicted (NDFDCC) | Measured (GeoNames/Ish) | Predicted (NDFD) |
+| Quantity | Measured (GeoNames2/Ish2) | Predicted (NDFD2) | Measured (GeoNames/Ish) | Predicted (NDFD) |
 |---|---|---|---|---|
 | Temperature | 0 | 16 | 1 | 2 |
 | Dew Point | 1 | 17 | 4 | 5 |
@@ -41,7 +41,7 @@ and the CC schema, and between measured and predicted values:
 | Clouds | 6 | 22 | 10 | 11 |
 
 Pressure has no predicted counterpart in either schema (NDFD doesn't forecast it). The live schema
-derives predicted IDs as `measured + 1`; the CC schema uses `measured + 16`.
+derives predicted IDs as `measured + 1`; the `larsi-weather2` schema uses `measured + 16`.
 
 ## Requirements
 

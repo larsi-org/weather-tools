@@ -85,7 +85,7 @@ class MeteredDataConnector
 		sqlConnection!!.close()
 	}
 
-	fun insertLogSQLCC(stationId: String, dateTime: Int, sensorID: Int, value: Any?): String =
+	fun insertLogSQL2(stationId: String, dateTime: Int, sensorID: Int, value: Any?): String =
 		"INSERT INTO log VALUES ($dateTime, '$stationId', $sensorID, $value)"
 
 	fun insertLogSQL(prefix: String, dateTime: Int, sensorID: Int, value: Any?): String =
@@ -95,13 +95,13 @@ class MeteredDataConnector
 	fun insertLog(prefix: String, dateTime: Int, sensorID: Int, value: Any?) =
 		executeUpdate(insertLogSQL(prefix, dateTime, sensorID, value))
 
-	fun emptyLogSQLCC(prefix: String, sensorID: Int): String =
+	fun emptyLogSQL2(prefix: String, sensorID: Int): String =
 		"DELETE FROM log WHERE station='$prefix' AND sensor_id=$sensorID"
 
 	fun emptyLogSQL(prefix: String, sensorID: Int): String =
 		"DELETE FROM ${prefix}_log WHERE SensorID=$sensorID"
 
-	fun cleanLogSQLCC(prefix: String, sensorIDs: String, timeMin: Int, timeMax: Int): String =
+	fun cleanLogSQL2(prefix: String, sensorIDs: String, timeMin: Int, timeMax: Int): String =
 		"DELETE FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs) AND epoch >= $timeMin AND epoch <= $timeMax"
 
 	fun cleanLogSQL(prefix: String, sensorIDs: String, timeMin: Int, timeMax: Int): String =
@@ -111,7 +111,7 @@ class MeteredDataConnector
 		"OPTIMIZE TABLE $name"
 
 	@Throws(SQLException::class)
-	fun getMaxDateTimeLogCC(prefix: String, sensorID: Int): Int =
+	fun getMaxDateTimeLog2(prefix: String, sensorID: Int): Int =
 		queryInt("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id=$sensorID")
 
 	@Throws(SQLException::class)
@@ -119,7 +119,7 @@ class MeteredDataConnector
 		queryInt("SELECT MAX(DateTime) FROM ${prefix}_log WHERE SensorID=$sensorID")
 
 	@Throws(SQLException::class)
-	fun getMaxDateTimeLogCC(prefix: String, sensorIDs: String): Int =
+	fun getMaxDateTimeLog2(prefix: String, sensorIDs: String): Int =
 		queryInt("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs)")
 
 	@Throws(SQLException::class)

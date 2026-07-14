@@ -17,7 +17,7 @@ import org.w3c.dom.Element
 
 import org.larsi.util.MeteredDataConnector
 
-object GeoNamesCC
+object GeoNames2
 {
 	/** XML tags that get reported */
 	val TAGS = arrayOf(
@@ -58,7 +58,7 @@ object GeoNamesCC
 		val FORMAT_1: NumberFormat = DecimalFormat("0.0")
 
 		try {
-			val md = MeteredDataConnector("larsi-weathercc")
+			val md = MeteredDataConnector("larsi-weather2")
 
 			/** Get ICAO entries */
 			val entries = md.queryList("SELECT Prefix FROM location;") { it.getString(1).uppercase() }
@@ -93,7 +93,7 @@ object GeoNamesCC
 									break
 								}
 								time = (formatter.parse(value).time / 1000).toInt()
-								if (time <= md.getMaxDateTimeLogCC(prefix, "0,1,2,3,4,5,6")) {
+								if (time <= md.getMaxDateTimeLog2(prefix, "0,1,2,3,4,5,6")) {
 									println("up to date")
 									break
 								}
@@ -114,7 +114,7 @@ object GeoNamesCC
 											}
 										}
 									}
-									md.addBatch(md.insertLogSQLCC(prefix, time, typeID - 1, value))
+									md.addBatch(md.insertLogSQL2(prefix, time, typeID - 1, value))
 								}
 							}
 						}

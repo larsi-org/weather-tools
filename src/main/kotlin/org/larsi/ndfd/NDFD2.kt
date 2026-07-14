@@ -14,7 +14,7 @@ import org.apache.axis.client.Service
 
 import org.larsi.util.MeteredDataConnector
 
-class NDFDCC
+class NDFD2
 {
 	companion object {
 		val entries = mutableListOf<NDFDEntry>()
@@ -46,7 +46,7 @@ class NDFDCC
 		@JvmStatic
 		fun check() {
 			try {
-				val md = MeteredDataConnector("larsi-weathercc")
+				val md = MeteredDataConnector("larsi-weather2")
 
 				/** Get ICAO entries */
 				entries.addAll(md.queryList("SELECT Prefix, Y(Location) AS Latitude, X(Location) AS Longitude FROM location") {
@@ -58,7 +58,7 @@ class NDFDCC
 				for (entry in entries) {
 					try {
 						print("Checking: ${entry.prefix}")
-						val predictions = NDFDCC()
+						val predictions = NDFD2()
 
 						// collects data from NDFD site, saves it as xml-formatted response string requestResponse
 						val response = predictions.soapRequest(entry.latitude, entry.longitude)
@@ -210,16 +210,16 @@ class NDFDCC
 				print(" $j")
 
 				try {
-					md.addBatch(md.emptyLogSQLCC(prefix, sensorIDs[j]))
+					md.addBatch(md.emptyLogSQL2(prefix, sensorIDs[j]))
 					val v = values[j]
 					val t = times[j]
-					val lastCurrent = md.getMaxDateTimeLogCC(prefix, sensorIDs[j] - 16)
+					val lastCurrent = md.getMaxDateTimeLog2(prefix, sensorIDs[j] - 16)
 					if (prefix.startsWith("K")) {
 						val cnt = if (v.size < t.size) v.size else t.size
 						for (i in 0 until cnt) {
 							val tPredicted = t[i]
 							if (tPredicted > lastCurrent)
-								md.addBatch(md.insertLogSQLCC(prefix, tPredicted, sensorIDs[j], v[i]))
+								md.addBatch(md.insertLogSQL2(prefix, tPredicted, sensorIDs[j], v[i]))
 						}
 					}
 				} catch (e: SQLException) {
