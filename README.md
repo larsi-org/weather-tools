@@ -59,20 +59,20 @@ Pressure has no predicted counterpart (NDFD doesn't forecast it). Predicted IDs 
 mvn clean package
 ```
 
-This produces three runnable jars in `target/`, each bundling the full project plus dependencies:
+This produces five runnable jars in `target/`, each bundling the full project plus dependencies:
 
 | Jar | Runs |
 |---|---|
 | `target/geonames.jar` | `org.larsi.GeoNames2` |
 | `target/ndfd.jar` | `org.larsi.NDFD2` |
 | `target/zeus.jar` | `org.larsi.Zeus` |
+| `target/ishharvester.jar` | `org.larsi.IshHarvester` |
+| `target/ish2.jar` | `org.larsi.Ish2` |
 
-`ish/`'s two entry points (`org.larsi.IshHarvester`, `org.larsi.Ish2`) aren't
-packaged into a standalone jar; run them via the classpath instead:
-
-```sh
-java -cp target/weather-tools-1.0-SNAPSHOT.jar:$(mvn -q dependency:build-classpath -Dmdep.outputFile=/dev/stdout) org.larsi.IshHarvester
-```
+Run any of them with `java -jar target/<jar>` from a directory containing `credentials.json`
+(`IshHarvester` doesn't need one, since it only downloads files — no DB access). `IshHarvester`
+and `Ish2` are still two separate manual steps (download the archive, then import it), not a
+pipeline — run `IshHarvester` first, then `Ish2` once the archive is on disk.
 
 ## Configuration
 
