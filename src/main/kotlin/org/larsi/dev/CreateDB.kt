@@ -491,7 +491,7 @@ object CreateDB
 		println("CREATE TABLE IF NOT EXISTS `log` (")
 		println("  `epoch` int NOT NULL,")
 		println("  `station` ENUM ($st) NOT NULL,")
-		println("  `sensor_id` tinyint NOT NULL,")
+		println("  `sensor_id` tinyint unsigned NOT NULL,")
 		println("  `value` float NOT NULL,")
 		println("  KEY `epoch` (`epoch`),")
 		println("  KEY `station` (`station`),")
