@@ -42,7 +42,7 @@ object Ish
 	fun main(args: Array<String>) {
 		formatter.timeZone = TimeZone.getTimeZone("GMT")
 
-		for (year in 2020..2020) {
+		for (year in 2024..2025) {
 			println(">>> STARTING UPLOAD YEAR: $year <<<")
 
 			for ((idx, entry) in Icao.entries.withIndex()) {

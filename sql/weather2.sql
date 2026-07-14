@@ -14,6 +14,12 @@
 --     always uppercases whatever it reads back before matching it against the `log.station` ENUM,
 --     so the stored case doesn't affect querying).
 -- Run against the larsi-weather2 database (empty, created 2026-07-13 on the production server).
+--
+-- WARNING (as of 2026-07-14): larsi-weather2.log now holds live production data — GeoNames2 has
+-- been running against it since Jenkins was switched over from GeoNames. Since 2026-07-14, `log`
+-- and `location`'s DROP TABLE IF EXISTS statements below are destructive if this file is ever
+-- re-run in full; extract only the section you actually need to (re-)run (e.g. the `sensor` table
+-- added below was applied standalone, not by rerunning this whole file).
 
 DROP TABLE IF EXISTS `log`;
 CREATE TABLE IF NOT EXISTS `log` (
@@ -343,3 +349,47 @@ INSERT INTO `location` VALUES('kwal', 'Wallops Island, VA, US', GeomFromText('PO
 INSERT INTO `location` VALUES('kelm', 'Elmira, NY, US', GeomFromText('POINT(-076.892 +42.159)'), +0291.1, 0, 50, 'Elmira, Elmira / Corning Regional Airport, NY, US');
 INSERT INTO `location` VALUES('kith', 'Ithaca, NY, US', GeomFromText('POINT(-076.467 +42.483)'), +0335.0, 0, 50, 'Ithaca, Ithaca Tompkins Regional Airport, NY, US');
 INSERT INTO `location` VALUES('kroc', 'Rochester, NY, US', GeomFromText('POINT(-077.677 +43.117)'), +0164.3, 0, 50, 'Rochester, Greater Rochester International Airport, NY, US');
+
+-- `sensor`: per-sensor-ID display metadata (Description/Property/Unit), read by
+-- ~/Public/html/weather/json/sensors.php's JOIN to render report.php's "Sensors" table.
+-- Schema and row content copied from the live larsi-weather.sensor table (SHOW CREATE TABLE /
+-- SELECT *), with `ID` remapped from the old measured/measured+1 scheme to the new
+-- measured(0-6)/measured+16 scheme. Count/DateTimeMin/DateTimeMax/ValueMin/ValueMax are all 0 in
+-- the source table too — sensors.php computes those live via its own JOIN aggregate, it never
+-- reads the stored columns, so they're carried over as inert placeholders for schema parity only.
+-- Excludes the source table's "Weather Condition" rows (old IDs 13/14): GeoNames2 has no sensor
+-- slot for that field at all (removed entirely, not just unpopulated — see GeoNames2.kt/README.md
+-- sensor ID table), so there is no corresponding channel to describe in larsi-weather2.
+DROP TABLE IF EXISTS `sensor`;
+CREATE TABLE `sensor` (
+  `Prefix` varchar(16) NOT NULL,
+  `ID` smallint(6) NOT NULL,
+  `Description` varchar(64) NOT NULL,
+  `Sensor` varchar(32) NOT NULL,
+  `Property` varchar(32) NOT NULL,
+  `Unit` varchar(16) NOT NULL,
+  `Count` int(11) NOT NULL DEFAULT 0,
+  `DateTimeMin` int(11) NOT NULL DEFAULT 0,
+  `DateTimeMax` int(11) NOT NULL DEFAULT 0,
+  `ValueMin` float NOT NULL DEFAULT 0,
+  `ValueMax` float NOT NULL DEFAULT 0,
+  `ZeusMinutes` int(11) NOT NULL DEFAULT 0,
+  `ZeusSuccessful` tinyint(1) NOT NULL DEFAULT 0,
+  `Comment` varchar(255) NOT NULL,
+  PRIMARY KEY (`ID`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+INSERT INTO `sensor` VALUES('ICAO', 0, 'Temperature (measured)', 'ICAO', 'Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 16, 'Temperature (predicted)', 'ICAO', 'Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 1, 'Dew Point Temperature (measured)', 'ICAO', 'Dew Point Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 17, 'Dew Point Temperature (predicted)', 'ICAO', 'Dew Point Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 2, 'Relative Humidity (measured)', 'ICAO', 'Relative Humidity', '%', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 18, 'Relative Humidity (predicted)', 'ICAO', 'Relative Humidity', '%', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 3, 'Pressure (measured)', 'ICAO', 'Pressure', 'hPa', 0, 0, 0, 0, 0, 0, 0, 'At sea level');
+INSERT INTO `sensor` VALUES('ICAO', 19, 'Pressure (predicted)', 'ICAO', 'Pressure', 'hPa', 0, 0, 0, 0, 0, 0, 0, 'At sea level');
+INSERT INTO `sensor` VALUES('ICAO', 4, 'Wind Direction (measured)', 'ICAO', 'Wind Direction', 'deg', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 20, 'Wind Direction (predicted)', 'ICAO', 'Wind Direction', 'deg', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 5, 'Wind Speed (measured)', 'ICAO', 'Wind Speed', 'm/s', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 21, 'Wind Speed (predicted)', 'ICAO', 'Wind Speed', 'm/s', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 6, 'Clouds (measured)', 'ICAO', 'Clouds', '10th', 0, 0, 0, 0, 0, 0, 0, '');
+INSERT INTO `sensor` VALUES('ICAO', 22, 'Clouds (predicted)', 'ICAO', 'Clouds', '10th', 0, 0, 0, 0, 0, 0, 0, '');
