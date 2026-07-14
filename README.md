@@ -63,7 +63,7 @@ This produces three runnable jars in `target/`, each bundling the full project p
 | `target/ndfd.jar` | `org.larsi.ndfd.NDFD` |
 | `target/zeus.jar` | `org.larsi.zeus.Zeus` |
 
-`ish/`'s two entry points (`org.larsi.ish.IshHarvester`, `org.larsi.ish.IshDatabase`) aren't
+`ish/`'s two entry points (`org.larsi.ish.IshHarvester`, `org.larsi.ish.Ish`) aren't
 packaged into a standalone jar; run them via the classpath instead:
 
 ```sh

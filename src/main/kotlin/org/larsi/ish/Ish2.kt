@@ -16,8 +16,6 @@ import org.larsi.util.PsychrometricsUtil
 
 object Ish2
 {
-	val directory: String = "${System.getProperty("user.home")}/Desktop/noaa/"
-
 	var iWork: Int = 0
 
 	var formatter: DateFormat = SimpleDateFormat("yyyyMMddHHmm")
@@ -49,7 +47,7 @@ object Ish2
 
 			for ((idx, entry) in Icao.entries.withIndex()) {
 				val prefix = entry.name.uppercase()
-				val inName = "$directory$year/${entry.usafWban}-$year.gz"
+				val inName = "${IshHarvester.directory}$year/${entry.usafWban}-$year.gz"
 
 				if (!File(inName).exists())
 					continue

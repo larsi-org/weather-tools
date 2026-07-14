@@ -9,7 +9,7 @@ import org.larsi.util.Icao
 
 object IshHarvester
 {
-	val directory: String = "${System.getProperty("user.home")}/Desktop/noaa/"
+	val directory: String = "${System.getProperty("user.home")}/Desktop/weather-tools/"
 
 	@JvmStatic
 	fun main(args: Array<String>) {
