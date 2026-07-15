@@ -14,78 +14,75 @@ import org.apache.axis.client.Service
 
 import org.larsi.util.MeteredDataConnector
 
-class NDFD2
+object NDFD2
 {
-	companion object {
-		val entries = mutableListOf<NDFDEntry>()
+	val entries = mutableListOf<NDFDEntry>()
 
-		const val SENSOR_CNT = 6
+	const val SENSOR_CNT = 6
 
-		val sensorIDs = intArrayOf( // SENSOR_CNT
-			16, // ICAO Temperature (predicted)
-			17, // ICAO Dew Point Temperature (predicted)
-			21, // ICAO Wind Speed (predicted)
-			20, // ICAO Wind Direction (predicted)
-			22, // ICAO Clouds (predicted)
-			18, // ICAO Humidity (predicted)
-		)
+	val sensorIDs = intArrayOf( // SENSOR_CNT
+		16, // ICAO Temperature (predicted)
+		17, // ICAO Dew Point Temperature (predicted)
+		21, // ICAO Wind Speed (predicted)
+		20, // ICAO Wind Direction (predicted)
+		22, // ICAO Clouds (predicted)
+		18, // ICAO Humidity (predicted)
+	)
 
-		// local variables used in search
-		val searchString = arrayOf( // SENSOR_CNT
-			"<temperature type=\"hourly\"",        // dry bulb temperature (C)
-			"<temperature type=\"dew point\"",     // dew point temperature (C)
-			"<wind-speed type=\"sustained\"",      // wind speed (m/s)
-			"<direction type=\"wind\"",            // wind direction (degrees true)
-			"<cloud-amount type=\"total\"",        // cloud cover (percent)
-			"<humidity type=\"relative\""          // humidity (percent)
-		)
+	// local variables used in search
+	val searchString = arrayOf( // SENSOR_CNT
+		"<temperature type=\"hourly\"",        // dry bulb temperature (C)
+		"<temperature type=\"dew point\"",     // dew point temperature (C)
+		"<wind-speed type=\"sustained\"",      // wind speed (m/s)
+		"<direction type=\"wind\"",            // wind direction (degrees true)
+		"<cloud-amount type=\"total\"",        // cloud cover (percent)
+		"<humidity type=\"relative\""          // humidity (percent)
+	)
 
-		/** keeps the date formatter for parsing the time stamp */
-		val SDF = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:sszzzzzzzzz")
+	/** keeps the date formatter for parsing the time stamp */
+	val SDF = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:sszzzzzzzzz")
 
-		@JvmStatic
-		fun check() {
-			try {
-				val md = MeteredDataConnector("larsi-weather2")
+	@JvmStatic
+	fun check() {
+		try {
+			val md = MeteredDataConnector("larsi-weather2")
 
-				/** Get ICAO entries */
-				entries.addAll(md.queryList("SELECT Prefix, Y(Location) AS Latitude, X(Location) AS Longitude FROM location") {
-					NDFDEntry(it.getString(1).uppercase(), it.getString(2), it.getString(3))
-				}.filter { it.prefix.startsWith("K") })
+			/** Get ICAO entries */
+			entries.addAll(md.queryList("SELECT Prefix, Y(Location) AS Latitude, X(Location) AS Longitude FROM location") {
+				NDFDEntry(it.getString(1).uppercase(), it.getString(2), it.getString(3))
+			}.filter { it.prefix.startsWith("K") })
 
-				// check all entries
-				println("Checking ${entries.size} Entries...")
-				for (entry in entries) {
-					try {
-						print("Checking: ${entry.prefix}")
-						val predictions = NDFD2()
+			// check all entries
+			println("Checking ${entries.size} Entries...")
+			for (entry in entries) {
+				try {
+					print("Checking: ${entry.prefix}")
 
-						// collects data from NDFD site, saves it as xml-formatted response string requestResponse
-						val response = predictions.soapRequest(entry.latitude, entry.longitude)
+					// collects data from NDFD site, saves it as xml-formatted response string requestResponse
+					val response = soapRequest(entry.latitude, entry.longitude)
 
-						// parses xml response, saves data to class variables
-						predictions.parseXMLresponse(response)
+					// parses xml response, saves data to class variables
+					parseXMLresponse(response)
 
-						// update database
-						predictions.update(md, entry.prefix)
+					// update database
+					update(md, entry.prefix)
 
-					} catch (e: Exception) {
-						System.err.println("Soap call failed!")
-					}
-
+				} catch (e: Exception) {
+					System.err.println("Soap call failed!")
 				}
 
-				md.close()
-			} catch (e: Exception) {
-				e.printStackTrace()
 			}
-		}
 
-		@JvmStatic
-		fun main(args: Array<String>) {
-			check()
-			println("Done")
+			md.close()
+		} catch (e: Exception) {
+			e.printStackTrace()
 		}
+	}
+
+	@JvmStatic
+	fun main(args: Array<String>) {
+		check()
+		println("Done")
 	}
 
 	/** dry bulb temperature */
@@ -124,13 +121,13 @@ class NDFD2
 		weatherParams[0] = "temp = TRUE"
 
 		val ret = call.invoke(arrayOf<Any>(
-				latitude, // <latitude>
-				longitude, //<longitude>
-				"time-series", //<product>
-				"2004-01-01T00:00:00", //<startTime>
-				"2030-01-12T00:00:00", //<endTime>
-				"m", //<Unit>
-				weatherParams
+			latitude, // <latitude>
+			longitude, //<longitude>
+			"time-series", //<product>
+			"2004-01-01T00:00:00", //<startTime>
+			"2030-01-12T00:00:00", //<endTime>
+			"m", //<Unit>
+			weatherParams
 		))
 
 		return ret as String
@@ -148,10 +145,10 @@ class NDFD2
 
 		values.clear()
 		times.clear()
-		for (j in 0 until SENSOR_CNT) {
-			values.add(mutableListOf())
-			times.add(mutableListOf())
-		}
+        (0 until SENSOR_CNT).forEach { _ ->
+            values.add(mutableListOf())
+            times.add(mutableListOf())
+        }
 
 		// finds line number and "time-layout" string associated with each data type of interest
 		for (i in responseByLineNum.indices) {
@@ -210,16 +207,17 @@ class NDFD2
 				print(" $j")
 
 				try {
-					md.addBatch(md.emptyLogSQL2(prefix, sensorIDs[j]))
+					val sensorID = sensorIDs[j]
+					md.addBatch(md.emptyLogSQL2(prefix, sensorID))
 					val v = values[j]
 					val t = times[j]
-					val lastCurrent = md.getMaxDateTimeLog2(prefix, sensorIDs[j] - 16)
+					val lastCurrent = md.getMaxDateTimeLog2(prefix, sensorID - 16)
 					if (prefix.startsWith("K")) {
-						val cnt = if (v.size < t.size) v.size else t.size
+						val cnt = minOf(v.size, t.size)
 						for (i in 0 until cnt) {
 							val tPredicted = t[i]
 							if (tPredicted > lastCurrent)
-								md.addBatch(md.insertLogSQL2(prefix, tPredicted, sensorIDs[j], v[i]))
+								md.addBatch(md.insertLogSQL2(prefix, tPredicted, sensorID, v[i]))
 						}
 					}
 				} catch (e: SQLException) {
@@ -234,6 +232,5 @@ class NDFD2
 	}
 
 	/** Keeps one enabled check entry */
-	class NDFDEntry(val prefix: String, val latitude: String, val longitude: String)
-
+	data class NDFDEntry(val prefix: String, val latitude: String, val longitude: String)
 }

@@ -64,10 +64,9 @@ object GeoNames2
 			val entries = md.queryList("SELECT Prefix FROM location;") { it.getString(1).uppercase() }
 
 			// check all entries
-			println("Checking ${entries.size} Stations...")
-			for (entry in entries) {
-				print("$entry - ")
+			for ((i, entry) in entries.withIndex()) {
 				val prefix = entry.uppercase()
+				print("${String.format("%4s", i + 1)} / ${String.format("%4s", entries.size)} - $prefix: ")
 				url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
 
 				try {

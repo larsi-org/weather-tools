@@ -40,13 +40,13 @@ object Zeus
 			// Check if values are outdated
 			zeusEntries = md.queryList("SELECT S.`Prefix`, S.`ID`, S.`DateTimeMax`, S.`ZeusMinutes`, S.`ZeusSuccessful`, U.`Email` FROM sensor AS S, user AS U, location AS L WHERE S.`ZeusMinutes` > 0 && S.`Prefix` = L.`Prefix` && L.`OwnerID` = U.`ID`") {
 				ZeusEntry(
-						it.getString(1),
-						it.getInt(2),
-						it.getInt(3),
-						it.getInt(4),
-						it.getInt(5) != 0,
-						it.getString(6)
-						)
+                    prefix = it.getString(1),
+                    id = it.getInt(2),
+                    dateTimeMax = it.getInt(3),
+                    minutes = it.getInt(4),
+                    successful = it.getInt(5) != 0,
+                    email = it.getString(6)
+				)
 			}
 
 			println("Checking ${zeusEntries.size} zeus entries...")
@@ -94,34 +94,13 @@ object Zeus
 	}
 
 	/** Keeps one zeus entry */
-	class ZeusEntry
-	{
-		val prefix: String
-		val id: Int
-		val dateTimeMax: Int
-		val minutes: Int
-		val successful: Boolean
-		val email: String
-
-		constructor(prefix: String, id: Int)
-		{
-			this.prefix = prefix
-			this.id = id
-			this.dateTimeMax = 0
-			this.minutes = 0
-			this.successful = false
-			this.email = ""
-		}
-
-		constructor(prefix: String, id: Int, dateTimeMax: Int, minutes: Int, successful: Boolean, email: String)
-		{
-			this.prefix = prefix
-			this.id = id
-			this.dateTimeMax = dateTimeMax
-			this.minutes = minutes
-			this.successful = successful
-			this.email = email
-		}
-	}
+	data class ZeusEntry(
+		val prefix: String,
+		val id: Int,
+		val dateTimeMax: Int = 0,
+		val minutes: Int = 0,
+		val successful: Boolean = false,
+		val email: String = ""
+	)
 
 }
