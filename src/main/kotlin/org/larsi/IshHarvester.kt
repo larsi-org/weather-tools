@@ -11,6 +11,8 @@ object IshHarvester
 {
 	val directory: String = "${System.getProperty("user.home")}/Desktop/weather-tools/"
 
+	private fun progress(i: Int) = "${String.format("%4s", i + 1)} / ${String.format("%4s", Icao.entries.size)}"
+
 	@JvmStatic
 	fun main(args: Array<String>) {
 		try {
@@ -27,11 +29,11 @@ object IshHarvester
 					val outName = "$directory$name"
 
 					if (File(outName).exists()) {
-						println("${i + 1} / ${Icao.entries.size} - $prefix:\tAlready downloaded, skipping: $outName")
+						println("${progress(i)} - $prefix:\tAlready downloaded, skipping: $outName")
 						continue
 					}
 
-					println("${i + 1} / ${Icao.entries.size} - $prefix:\t$inName => $outName")
+					println("${progress(i)} - $prefix:\t$inName => $outName")
 
 					try {
 						URL(inName).openStream().use { input ->
@@ -40,11 +42,10 @@ object IshHarvester
 							}
 						}
 					} catch (e: FileNotFoundException) {
-						System.err.println(
-								"${String.format("%1\$4s", i + 1)} / ${String.format("%1\$4s", Icao.entries.size)} - $prefix:\tCould not find: $inName")
+						System.err.println("${progress(i)} - $prefix:\tCould not find: $inName")
 					} catch (e: Exception) {
 						System.err.println(
-								"${String.format("%1\$4s", i + 1)} / ${String.format("%1\$4s", Icao.entries.size)} - $prefix:\tDownload failed (${e.message}), deleting partial file and stopping so it can be resumed: $outName")
+								"${progress(i)} - $prefix:\tDownload failed (${e.message}), deleting partial file and stopping so it can be resumed: $outName")
 						File(outName).delete()
 						return
 					}

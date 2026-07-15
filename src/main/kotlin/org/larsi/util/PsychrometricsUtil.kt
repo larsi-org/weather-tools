@@ -63,54 +63,43 @@ object PsychrometricsUtil
 		}
 
 		// conversion back to C
-		var Tdp = fahrenheitToCelsius(TdpF)
+		val Tdp = fahrenheitToCelsius(TdpF)
 
 		// safety check since numerical noise can sometimes produce impossible conditions
-		if (Tdp > Tamb) { Tdp = Tamb }
-
-		return Tdp
+		return minOf(Tdp, Tamb)
 	}
 
 	@JvmStatic
-	fun getRH(tempC: Float, dewC: Float): Int
-	{
-		return (0.5 + 100.0 * ((112.0 - 0.1 * tempC + dewC) / (112.0 + 0.9 * tempC)).pow(8)).toInt()
-	}
+	fun getRH(tempC: Float, dewC: Float) =
+		(0.5 + 100.0 * ((112.0 - 0.1 * tempC + dewC) / (112.0 + 0.9 * tempC)).pow(8)).toInt()
 
 	/** °F to °R */
 	@JvmStatic
-	fun fahrenheitToRankine(fahrenheit: Float): Float {
-		return fahrenheit + 459.67f
-	}
+	fun fahrenheitToRankine(fahrenheit: Float) =
+		fahrenheit + 459.67f
 
 	/** °R to °F */
 	@JvmStatic
-	fun rankineToFahrenheit(rankine: Float): Float {
-		return rankine - 459.67f
-	}
+	fun rankineToFahrenheit(rankine: Float) =
+		rankine - 459.67f
 
 	/** K to °R */
 	@JvmStatic
-	fun kelvinToRankine(kelvin: Float): Float {
-		return kelvin * 1.8f
-	}
+	fun kelvinToRankine(kelvin: Float) =
+		kelvin * 1.8f
 
 	/** °R to K */
 	@JvmStatic
-	fun rankineToKelvin(rankine: Float): Float {
-		return rankine / 1.8f
-	}
+	fun rankineToKelvin(rankine: Float) =
+		rankine / 1.8f
 
 	/** °C to °F */
 	@JvmStatic
-	fun celsiusToFahrenheit(celsius: Float): Float {
-		return celsius * 1.8f + 32.0f
-	}
+	fun celsiusToFahrenheit(celsius: Float) =
+		celsius * 1.8f + 32.0f
 
 	/** °F to °C */
 	@JvmStatic
-	fun fahrenheitToCelsius(fahrenheit: Float): Float {
-		return (fahrenheit - 32.0f) / 1.8f
-	}
-
+	fun fahrenheitToCelsius(fahrenheit: Float) =
+		(fahrenheit - 32.0f) / 1.8f
 }

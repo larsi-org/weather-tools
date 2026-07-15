@@ -20,15 +20,15 @@ import org.larsi.util.MeteredDataConnector
 object GeoNames2
 {
 	/** XML tags that get reported */
-	val TAGS = arrayOf(
-			"observationTime", // 0 -> n/a
-			"temperature", // 1 -> 0
-			"dewPoint", // 2 -> 1
-			"humidity", // 3 -> 2
-			"seaLevelPressure", // 4 -> 3
-			"windDirection", // 5 -> 4
-			"windSpeed", // 6 -> 5
-			"clouds" // 7 -> 6
+	val TAGS = listOf(
+		"observationTime", // 0 -> n/a
+		"temperature", // 1 -> 0
+		"dewPoint", // 2 -> 1
+		"humidity", // 3 -> 2
+		"seaLevelPressure", // 4 -> 3
+		"windDirection", // 5 -> 4
+		"windSpeed", // 6 -> 5
+		"clouds" // 7 -> 6
 	)
 
 	var url: String? = null

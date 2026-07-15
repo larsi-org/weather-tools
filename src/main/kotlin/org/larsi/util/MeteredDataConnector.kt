@@ -64,24 +64,24 @@ class MeteredDataConnector
 	 * Usually a 'SELECT' statement
 	 */
 	@Throws(SQLException::class)
-	fun executeQuery(statement: String): ResultSet =
-		sqlStatement!!.executeQuery(statement)
+	fun executeQuery(s: String): ResultSet =
+		sqlStatement!!.executeQuery(s)
 
 	/**
 	 * Attempts to submit the statement given<br></br>
 	 * Usually an 'INSERT' 'DELETE' or 'UPDATE' statement
 	 */
 	@Throws(SQLException::class)
-	fun executeUpdate(statement: String): Int =
-		sqlStatement!!.executeUpdate(statement)
+	fun executeUpdate(s: String): Int =
+		sqlStatement!!.executeUpdate(s)
 
 	@Throws(SQLException::class)
 	fun clearBatch() =
 		sqlStatement!!.clearBatch()
 
 	@Throws(SQLException::class)
-	fun addBatch(sql: String) =
-		sqlStatement!!.addBatch(sql)
+	fun addBatch(sqlString: String) =
+		sqlStatement!!.addBatch(sqlString)
 
 	@Throws(SQLException::class)
 	fun executeBatch(): IntArray =
@@ -100,24 +100,11 @@ class MeteredDataConnector
 	fun insertLogSQL2(stationId: String, dateTime: Int, sensorID: Int, value: Any?): String =
 		"INSERT INTO log VALUES ($dateTime, '$stationId', $sensorID, $value)"
 
-	fun insertLogSQL(prefix: String, dateTime: Int, sensorID: Int, value: Any?): String =
-		"INSERT INTO ${prefix}_log VALUES ('$dateTime', '$sensorID', '$value')"
-
-	@Throws(SQLException::class)
-	fun insertLog(prefix: String, dateTime: Int, sensorID: Int, value: Any?) =
-		executeUpdate(insertLogSQL(prefix, dateTime, sensorID, value))
-
 	fun emptyLogSQL2(prefix: String, sensorID: Int): String =
 		"DELETE FROM log WHERE station='$prefix' AND sensor_id=$sensorID"
 
-	fun emptyLogSQL(prefix: String, sensorID: Int): String =
-		"DELETE FROM ${prefix}_log WHERE SensorID=$sensorID"
-
 	fun cleanLogSQL2(prefix: String, sensorIDs: String, timeMin: Int, timeMax: Int): String =
 		"DELETE FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs) AND epoch >= $timeMin AND epoch <= $timeMax"
-
-	fun cleanLogSQL(prefix: String, sensorIDs: String, timeMin: Int, timeMax: Int): String =
-		"DELETE FROM ${prefix}_log WHERE SensorID IN ($sensorIDs) AND DateTime >= $timeMin AND DateTime <= $timeMax"
 
 	fun optimizeTable(name: String): String =
 		"OPTIMIZE TABLE $name"
@@ -127,16 +114,8 @@ class MeteredDataConnector
 		queryInt("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id=$sensorID")
 
 	@Throws(SQLException::class)
-	fun getMaxDateTimeLog(prefix: String, sensorID: Int): Int =
-		queryInt("SELECT MAX(DateTime) FROM ${prefix}_log WHERE SensorID=$sensorID")
-
-	@Throws(SQLException::class)
 	fun getMaxDateTimeLog2(prefix: String, sensorIDs: String): Int =
 		queryInt("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs)")
-
-	@Throws(SQLException::class)
-	fun getMaxDateTimeLog(prefix: String, sensorIDs: String): Int =
-		queryInt("SELECT MAX(DateTime) FROM ${prefix}_log WHERE SensorID IN ($sensorIDs)")
 
 	@Throws(SQLException::class)
 	fun <T> queryList(statement: String, mapper: (ResultSet) -> T): List<T> {

@@ -61,39 +61,16 @@ object Parser
 			val start = l.substring(82, 90).trim()
 			val end = l.substring(91, 99).trim()
 
-			if (start.equals("NO DATA", ignoreCase = true) || end.equals("NO DATA", ignoreCase = true))
-				continue
-
-			if (name.isEmpty())
-				continue
-			if (call.isEmpty())
-				continue
-
-			if (lat == "-99.999")
-				continue
-			if (lon == "-999.999")
-				continue
-			if (lat == "-9999.9")
-				continue
-
-			if (usaf == "999999")
-				continue
-			if (wban == "99999")
-				continue
-
-			if (!call.startsWith("K"))
-				continue
-			if (call.matches(Regex(".*[0-9].*")))
-				continue
-			if (ctry != "US")
+			if (start.equals("NO DATA", ignoreCase = true) || end.equals("NO DATA", ignoreCase = true) ||
+					name.isEmpty() || call.isEmpty() ||
+					lat == "-99.999" || lon == "-999.999" || lat == "-9999.9" ||
+					usaf == "999999" || wban == "99999" ||
+					!call.startsWith("K") || call.matches(Regex(".*[0-9].*")) || ctry != "US")
 				continue
 
 			val endYear = end.substring(0, 4).toInt()
-			if (endYear < 2020)
-				continue
-
 			val startYear = start.substring(0, 4).toInt()
-			if (startYear >= 2015)
+			if (endYear < 2020 || startYear >= 2015)
 				continue
 
 			val stationsEntry = inStations(call) ?: continue
@@ -129,12 +106,7 @@ object Parser
 			val priority = l.substring(79, 80)
 			// String country = line.substring(81, 83).toUpperCase();
 
-			if (!(priority == "0" || priority == "1" || priority == "2" || priority == "3" ||
-					priority == "4" || priority == "5" || icao == "KELM" || icao == "KITH" ||
-					icao == "KROC"))
-				continue
-
-			if (icao[0] != 'K')
+			if ((priority !in setOf("0", "1", "2", "3", "4", "5") && icao !in setOf("KELM", "KITH", "KROC")) || icao[0] != 'K')
 				continue
 
 			val url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$icao"

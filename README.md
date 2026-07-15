@@ -26,11 +26,6 @@ each:
 - **`util/`** — shared helpers: config loading, a JDBC connection/query helper, and psychrometric
   calculations.
 
-The `2` suffix on `GeoNames2`/`NDFD2`/`Ish2` is a naming artifact from when `larsi-weather2` was a
-prospective successor schema developed alongside the original, now-retired `GeoNames`/`NDFD`/`Ish`
-tools (which targeted the old per-station-table `larsi-weather` schema). That migration is
-complete — `larsi-weather2` is now the live schema and the old tools/schema have been removed.
-
 ## Sensor IDs
 
 Each stored quantity is identified by a numeric sensor ID:
