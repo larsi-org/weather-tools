@@ -66,7 +66,7 @@ object GeoNames2
 			// check all entries
 			for ((i, entry) in entries.withIndex()) {
 				val prefix = entry.uppercase()
-				print("${String.format("%4s", i + 1)} / ${String.format("%4s", entries.size)} - $prefix: ")
+				val header = "${String.format("%4s", i + 1)} / ${String.format("%4s", entries.size)} - $prefix:"
 				url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
 
 				try {
@@ -88,15 +88,15 @@ object GeoNames2
 
 							if (typeID == 0) {
 								if (value == null) {
-									println("down")
+									println("$header down")
 									break
 								}
 								time = (formatter.parse(value).time / 1000).toInt()
 								if (time <= md.getMaxDateTimeLog2(prefix, "0,1,2,3,4,5,6")) {
-									println("up to date")
+									println("$header up to date")
 									break
 								}
-								println("updating...")
+								println("$header updating...")
 							} else {
 								if (value != null) {
 									when (typeID) {
@@ -121,7 +121,7 @@ object GeoNames2
 
 					md.executeBatch()
 				} catch (e: Exception) {
-					println("Did not receive / could not parse data!")
+					println("$header did not receive / could not parse data!")
 				}
 			}
 
