@@ -13,6 +13,7 @@ import java.util.zip.GZIPInputStream
 import org.larsi.util.Icao
 import org.larsi.util.MeteredDataConnector
 import org.larsi.util.PsychrometricsUtil
+import org.larsi.util.WeatherToolsConfig
 
 object Ish2
 {
@@ -47,7 +48,7 @@ object Ish2
 
 			for ((idx, entry) in Icao.entries.withIndex()) {
 				val prefix = entry.name.uppercase()
-				val inName = "${IshHarvester.directory}$year/${entry.usafWban}-$year.gz"
+				val inName = File(WeatherToolsConfig.WORK_DIRECTORY, "$year/${entry.usafWban}-$year.gz").path
 
 				if (!File(inName).exists())
 					continue

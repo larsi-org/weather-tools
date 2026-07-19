@@ -18,29 +18,25 @@ object GetIcons
 	 */
 	const val ZOOM = 6
 	//final static int  ZOOM      = 9;
-	val DIRECTORY = File(File(System.getProperty("user.home"), "Desktop"), "temp")
+	val DIRECTORY = File(WeatherToolsConfig.WORK_DIRECTORY, "icons")
 
 	@JvmStatic
 	fun main(args: Array<String>)
 	{
 		try {
-			//MeteredDataConnector md = new MeteredDataConnector(WeatherToolsConfig.get("database", "metereddata"));
 			val md = MeteredDataConnector("larsi-epw")
 
-			val result = md.executeQuery("SELECT Prefix, Y(Location), X(Location) FROM location WHERE 1 ORDER BY Prefix")
+			val locations = md.queryList("SELECT Prefix, Y(Location), X(Location) FROM location WHERE 1 ORDER BY Prefix") {
+				Location(it.getString(1).lowercase(), it.getFloat(2), it.getFloat(3))
+			}
 
-			while (result.next()) {
-				val prefix = result.getString(1).lowercase()
-				val lat = result.getFloat(2)
-				val lng = result.getFloat(3)
-
+			for ((prefix, lat, lng) in locations) {
 				println(prefix)
 
 				val api = if (lat == 0.0f && lng == 0.0f) "center=0,0&zoom=0&size=360x180" else
 					"center=$lat,$lng&zoom=$ZOOM&size=360x180&markers=color:red%7Clabel:.%7C$lat,$lng"
 
-				// Not sure why, but "sensor" argument must be added (false for no GPS)
-				val url = "http://maps.googleapis.com/maps/api/staticmap?$api&sensor=false&key=${WeatherToolsConfig.googleMaps!!["apiKey"]}"
+				val url = "https://maps.googleapis.com/maps/api/staticmap?$api&key=${WeatherToolsConfig.googleMaps!!["apiKey"]}"
 
 				try {
 					URL(url).openStream().use { input ->
@@ -55,11 +51,12 @@ object GetIcons
 
 				Thread.sleep(2000L) // wait 5 seconds
 			}
-			result.close()
 			md.close()
 		}
 		catch (e: Exception) {
 			e.printStackTrace()
 		}
 	}
+
+	data class Location(val prefix: String, val lat: Float, val lng: Float)
 }

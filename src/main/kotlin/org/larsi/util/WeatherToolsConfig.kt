@@ -11,6 +11,8 @@ object WeatherToolsConfig
 	private const val CREDENTIALS = "credentials.json"
 	private val GSON = Gson()
 
+	val WORK_DIRECTORY = File("${System.getProperty("user.home")}/Desktop/weather-tools/")
+
 	val database: Map<String, String>?
 	val googleMaps: Map<String, String>?
 
