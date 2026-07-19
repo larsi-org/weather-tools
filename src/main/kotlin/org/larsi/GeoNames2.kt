@@ -117,6 +117,8 @@ object GeoNames2
 								}
 							}
 						}
+					} else {
+						println("$header no observation available")
 					}
 
 					md.executeBatch()
