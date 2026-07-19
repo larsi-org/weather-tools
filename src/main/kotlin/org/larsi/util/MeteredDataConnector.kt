@@ -106,16 +106,19 @@ class MeteredDataConnector
 	fun cleanLogSQL2(prefix: String, sensorIDs: String, timeMin: Int, timeMax: Int): String =
 		"DELETE FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs) AND epoch >= $timeMin AND epoch <= $timeMax"
 
+	fun updateLastEpochSQL2(prefix: String, epoch: Int): String =
+		"UPDATE location SET last_epoch=$epoch WHERE Prefix='$prefix'"
+
 	fun optimizeTable(name: String): String =
 		"OPTIMIZE TABLE $name"
 
 	@Throws(SQLException::class)
 	fun getMaxDateTimeLog2(prefix: String, sensorID: Int): Int =
-		queryInt("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id=$sensorID")
+		queryList("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id=$sensorID") { it.getInt(1) }.first()
 
 	@Throws(SQLException::class)
 	fun getMaxDateTimeLog2(prefix: String, sensorIDs: String): Int =
-		queryInt("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs)")
+		queryList("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs)") { it.getInt(1) }.first()
 
 	@Throws(SQLException::class)
 	fun <T> queryList(statement: String, mapper: (ResultSet) -> T): List<T> {
@@ -126,8 +129,4 @@ class MeteredDataConnector
 		result.close()
 		return list
 	}
-
-	@Throws(SQLException::class)
-	private fun queryInt(sql: String): Int =
-		queryList(sql) { it.getInt(1) }.first()
 }

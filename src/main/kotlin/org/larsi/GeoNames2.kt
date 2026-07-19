@@ -79,10 +79,12 @@ object GeoNames2
 					val root = doc.documentElement
 					val nl = root.getElementsByTagName("observation")
 
+					var time = 0
+					var updated = false
+
 					if (nl != null && nl.length > 0) {
 						val obs = nl.item(0) as Element
 
-						var time = 0
 						for (typeID in TAGS.indices) {
 							var value = getTextValue(obs, TAGS[typeID])
 
@@ -97,6 +99,7 @@ object GeoNames2
 									break
 								}
 								println("$header updating...")
+								updated = true
 							} else {
 								if (value != null) {
 									when (typeID) {
@@ -122,6 +125,10 @@ object GeoNames2
 					}
 
 					md.executeBatch()
+
+					if (updated) {
+						md.executeUpdate(md.updateLastEpochSQL2(prefix, time))
+					}
 				} catch (e: Exception) {
 					println("$header did not receive / could not parse data!")
 				}
