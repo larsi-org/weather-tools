@@ -1,5 +1,6 @@
 package org.larsi.util
 
+import java.io.Closeable
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
@@ -7,7 +8,7 @@ import java.sql.SQLException
 import java.sql.Statement
 import java.util.logging.Logger
 
-class MeteredDataConnector
+class MeteredDataConnector : Closeable
 {
 	enum class DataBaseType(
 		val className: String,
@@ -91,7 +92,7 @@ class MeteredDataConnector
 	 * Close the statement and connection
 	 */
 	@Throws(SQLException::class)
-	fun close()
+	override fun close()
 	{
 		sqlStatement!!.close()
 		sqlConnection!!.close()

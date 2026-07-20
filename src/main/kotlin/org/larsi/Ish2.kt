@@ -62,52 +62,51 @@ object Ish2
 					process(lines[lines.size - 1])
 					val utcEnd = utc
 
-					val md = MeteredDataConnector("larsi-weather2")
-					md.clearBatch()
+					MeteredDataConnector("larsi-weather2").use { md ->
+						md.clearBatch()
 
-					md.addBatch(md.cleanLogSQL2(prefix, "0,1,2,3,4,5,6,7", utcStart, utcEnd))
+						md.addBatch(md.cleanLogSQL2(prefix, "0,1,2,3,4,5,6,7", utcStart, utcEnd))
 
-					val sb = StringBuilder()
-					sb.append("INSERT INTO log (epoch,station,sensor_id,value) VALUES ")
-					var rows = 0
-					for (line in lines) {
-						process(line)
+						val sb = StringBuilder()
+						sb.append("INSERT INTO log (epoch,station,sensor_id,value) VALUES ")
+						var rows = 0
+						for (line in lines) {
+							process(line)
 
-						// 0 Temperature
-						if (sMDS_Temp != "****")
-							insertLog(sb, ++rows, prefix, utc, 0, sMDS_Temp)
+							// 0 Temperature
+							if (sMDS_Temp != "****")
+								insertLog(sb, ++rows, prefix, utc, 0, sMDS_Temp)
 
-						// 1 Dew Point
-						if (sMDS_Dewp != "****")
-							insertLog(sb, ++rows, prefix, utc, 1, sMDS_Dewp)
+							// 1 Dew Point
+							if (sMDS_Dewp != "****")
+								insertLog(sb, ++rows, prefix, utc, 1, sMDS_Dewp)
 
-						// 2 Humidity
-						if (sMDS_Temp != "****" && sMDS_Dewp != "****")
-							insertLog(sb, ++rows, prefix, utc, 2,
-									PsychrometricsUtil.getRH(sMDS_Temp.toFloat(), sMDS_Dewp.toFloat()))
+							// 2 Humidity
+							if (sMDS_Temp != "****" && sMDS_Dewp != "****")
+								insertLog(sb, ++rows, prefix, utc, 2,
+										PsychrometricsUtil.getRH(sMDS_Temp.toFloat(), sMDS_Dewp.toFloat()))
 
-						// 3 Pressure
-						if (sMDS_Slp != "******")
-							insertLog(sb, ++rows, prefix, utc, 3, sMDS_Slp)
+							// 3 Pressure
+							if (sMDS_Slp != "******")
+								insertLog(sb, ++rows, prefix, utc, 3, sMDS_Slp)
 
-						// 4 Wind Direction
-						if (sMDS_Dir != "***")
-							insertLog(sb, ++rows, prefix, utc, 4, sMDS_Dir.toInt())
+							// 4 Wind Direction
+							if (sMDS_Dir != "***")
+								insertLog(sb, ++rows, prefix, utc, 4, sMDS_Dir.toInt())
 
-						// 5 Wind Speed
-						if (sMDS_Spd != "****")
-							insertLog(sb, ++rows, prefix, utc, 5, sMDS_Spd)
+							// 5 Wind Speed
+							if (sMDS_Spd != "****")
+								insertLog(sb, ++rows, prefix, utc, 5, sMDS_Spd)
 
-						// 6 Clouds
-						if (sGF1_Skc != "**")
-							insertLog(sb, ++rows, prefix, utc, 6, sGF1_Skc)
-					} // while read
-					md.addBatch(sb.toString())
+							// 6 Clouds
+							if (sGF1_Skc != "**")
+								insertLog(sb, ++rows, prefix, utc, 6, sGF1_Skc)
+						} // while read
+						md.addBatch(sb.toString())
 
-					println("${1 + idx}/${Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
-					md.executeBatch()
-
-					md.close()
+						println("${1 + idx}/${Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
+						md.executeBatch()
+					}
 				} catch (e: FileNotFoundException) {
 					println("Could not open: $inName")
 				}
@@ -118,9 +117,9 @@ object Ish2
 			println()
 		}
 
-		val md = MeteredDataConnector("larsi-weather2")
-		md.executeUpdate(md.optimizeTable("log"))
-		md.close()
+		MeteredDataConnector("larsi-weather2").use { md ->
+			md.executeUpdate(md.optimizeTable("log"))
+		}
 
 	} // End of main()
 

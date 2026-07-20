@@ -58,83 +58,81 @@ object GeoNames2
 		val FORMAT_1: NumberFormat = DecimalFormat("0.0")
 
 		try {
-			val md = MeteredDataConnector("larsi-weather2")
+			MeteredDataConnector("larsi-weather2").use { md ->
+				/** Get ICAO entries */
+				val entries = md.queryList("SELECT Prefix FROM location;") { it.getString(1).uppercase() }
 
-			/** Get ICAO entries */
-			val entries = md.queryList("SELECT Prefix FROM location;") { it.getString(1).uppercase() }
+				// check all entries
+				for ((i, entry) in entries.withIndex()) {
+					val prefix = entry.uppercase()
+					val header = "${String.format("%4s", i + 1)} / ${String.format("%4s", entries.size)} - $prefix:"
+					url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
 
-			// check all entries
-			for ((i, entry) in entries.withIndex()) {
-				val prefix = entry.uppercase()
-				val header = "${String.format("%4s", i + 1)} / ${String.format("%4s", entries.size)} - $prefix:"
-				url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
+					try {
+						md.clearBatch()
 
-				try {
-					md.clearBatch()
+						val future = executor.submit(GetDocument())
+						val doc = future.get(20, TimeUnit.SECONDS)
+						doc.documentElement.normalize()
 
-					val future = executor.submit(GetDocument())
-					val doc = future.get(20, TimeUnit.SECONDS)
-					doc.documentElement.normalize()
+						val root = doc.documentElement
+						val nl = root.getElementsByTagName("observation")
 
-					val root = doc.documentElement
-					val nl = root.getElementsByTagName("observation")
+						var time = 0
+						var updated = false
 
-					var time = 0
-					var updated = false
+						if (nl != null && nl.length > 0) {
+							val obs = nl.item(0) as Element
 
-					if (nl != null && nl.length > 0) {
-						val obs = nl.item(0) as Element
+							for (typeID in TAGS.indices) {
+								var value = getTextValue(obs, TAGS[typeID])
 
-						for (typeID in TAGS.indices) {
-							var value = getTextValue(obs, TAGS[typeID])
-
-							if (typeID == 0) {
-								if (value == null) {
-									println("$header down")
-									break
-								}
-								time = (formatter.parse(value).time / 1000).toInt()
-								if (time <= md.getMaxDateTimeLog2(prefix, "0,1,2,3,4,5,6")) {
-									println("$header up to date")
-									break
-								}
-								println("$header updating...")
-								updated = true
-							} else {
-								if (value != null) {
-									when (typeID) {
-										6 -> value = FORMAT_1.format(knotsToMPS * value.toFloat()) // wind speed
-										7 -> { // clouds
-											value = value.lowercase()
-											value = when (value) {
-												"n/a" -> "0"
-												"few clouds" -> "2"
-												"scattered clouds" -> "4"
-												"broken clouds" -> "7"
-												"overcast" -> "10"
-												else -> value
+								if (typeID == 0) {
+									if (value == null) {
+										println("$header down")
+										break
+									}
+									time = (formatter.parse(value).time / 1000).toInt()
+									if (time <= md.getMaxDateTimeLog2(prefix, "0,1,2,3,4,5,6")) {
+										println("$header up to date")
+										break
+									}
+									println("$header updating...")
+									updated = true
+								} else {
+									if (value != null) {
+										when (typeID) {
+											6 -> value = FORMAT_1.format(knotsToMPS * value.toFloat()) // wind speed
+											7 -> { // clouds
+												value = value.lowercase()
+												value = when (value) {
+													"n/a" -> "0"
+													"few clouds" -> "2"
+													"scattered clouds" -> "4"
+													"broken clouds" -> "7"
+													"overcast" -> "10"
+													else -> value
+												}
 											}
 										}
+										md.addBatch(md.insertLogSQL2(prefix, time, typeID - 1, value))
 									}
-									md.addBatch(md.insertLogSQL2(prefix, time, typeID - 1, value))
 								}
 							}
+						} else {
+							println("$header no observation available")
 						}
-					} else {
-						println("$header no observation available")
-					}
 
-					md.executeBatch()
+						md.executeBatch()
 
-					if (updated) {
-						md.executeUpdate(md.updateLastEpochSQL2(prefix, time))
+						if (updated) {
+							md.executeUpdate(md.updateLastEpochSQL2(prefix, time))
+						}
+					} catch (e: Exception) {
+						println("$header did not receive / could not parse data!")
 					}
-				} catch (e: Exception) {
-					println("$header did not receive / could not parse data!")
 				}
 			}
-
-			md.close()
 		} catch (e: Exception) {
 			e.printStackTrace()
 		}

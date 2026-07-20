@@ -45,35 +45,33 @@ object NDFD2
 	@JvmStatic
 	fun check() {
 		try {
-			val md = MeteredDataConnector("larsi-weather2")
+			MeteredDataConnector("larsi-weather2").use { md ->
+				/** Get ICAO entries */
+				entries.addAll(md.queryList("SELECT Prefix, Y(Location) AS Latitude, X(Location) AS Longitude FROM location") {
+					NDFDEntry(it.getString(1).uppercase(), it.getString(2), it.getString(3))
+				}.filter { it.prefix.startsWith("K") })
 
-			/** Get ICAO entries */
-			entries.addAll(md.queryList("SELECT Prefix, Y(Location) AS Latitude, X(Location) AS Longitude FROM location") {
-				NDFDEntry(it.getString(1).uppercase(), it.getString(2), it.getString(3))
-			}.filter { it.prefix.startsWith("K") })
+				// check all entries
+				println("Checking ${entries.size} Entries...")
+				for (entry in entries) {
+					try {
+						print("Checking: ${entry.prefix}")
 
-			// check all entries
-			println("Checking ${entries.size} Entries...")
-			for (entry in entries) {
-				try {
-					print("Checking: ${entry.prefix}")
+						// collects data from NDFD site, saves it as xml-formatted response string requestResponse
+						val response = soapRequest(entry.latitude, entry.longitude)
 
-					// collects data from NDFD site, saves it as xml-formatted response string requestResponse
-					val response = soapRequest(entry.latitude, entry.longitude)
+						// parses xml response, saves data to class variables
+						parseXMLresponse(response)
 
-					// parses xml response, saves data to class variables
-					parseXMLresponse(response)
+						// update database
+						update(md, entry.prefix)
 
-					// update database
-					update(md, entry.prefix)
+					} catch (e: Exception) {
+						System.err.println("Soap call failed!")
+					}
 
-				} catch (e: Exception) {
-					System.err.println("Soap call failed!")
 				}
-
 			}
-
-			md.close()
 		} catch (e: Exception) {
 			e.printStackTrace()
 		}
