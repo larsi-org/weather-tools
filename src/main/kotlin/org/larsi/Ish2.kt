@@ -104,8 +104,6 @@ object Ish2
 					} // while read
 					md.addBatch(sb.toString())
 
-					md.addBatch(md.optimizeTable("log"))
-
 					println("${1 + idx}/${Icao.entries.size}: $rows records - UTC:  $utcStart - $utcEnd - Go!")
 					md.executeBatch()
 
@@ -119,6 +117,10 @@ object Ish2
 			println(">>> $year DONE!!! <<<")
 			println()
 		}
+
+		val md = MeteredDataConnector("larsi-weather2")
+		md.executeUpdate(md.optimizeTable("log"))
+		md.close()
 
 	} // End of main()
 
