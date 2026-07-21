@@ -22,20 +22,17 @@ object Zeus
 					try {
 						println("${entry.prefix}[${entry.id}]")
 						val statsSQL = """
-							SELECT COUNT(*) AS `Count`, MIN(`DateTime`) AS `DateTimeMin`, MAX(`DateTime`) AS `DateTimeMax`, MIN(`Value`) AS `ValueMin`, MAX(`Value`) AS `ValueMax`
+							SELECT COUNT(*) AS `Count`, MAX(`DateTime`) AS `LastEpoch`
 							FROM ${entry.prefix}_log
 							WHERE `SensorID`=${entry.id}
 						""".trimIndent()
 						val stats = md.queryList(statsSQL) {
-							ZeusStats(it.getInt(1), it.getInt(2), it.getInt(3), it.getFloat(4), it.getFloat(5))
+							ZeusStats(it.getInt(1), it.getInt(2))
 						}.first()
 						val count = stats.count
-						val dateTimeMin = stats.dateTimeMin
-						val dateTimeMax = stats.dateTimeMax
-						val valueMin = stats.valueMin
-						val valueMax = stats.valueMax
+						val lastEpoch = stats.lastEpoch
 						val updateSQL = """
-							UPDATE sensor SET `Count`=$count, `DateTimeMin`=$dateTimeMin, `DateTimeMax`=$dateTimeMax, `ValueMin`=$valueMin, `ValueMax`=$valueMax
+							UPDATE sensor SET `Count`=$count, `last_epoch`=$lastEpoch
 							WHERE `Prefix`='${entry.prefix}' && `ID`=${entry.id}
 						""".trimIndent()
 						md.executeUpdate(updateSQL)
@@ -47,7 +44,7 @@ object Zeus
 
 				// Check if values are outdated
 				val zeusEntriesSQL = """
-					SELECT S.`Prefix`, S.`ID`, S.`DateTimeMax`, S.`ZeusMinutes`, S.`ZeusSuccessful`, U.`Email`
+					SELECT S.`Prefix`, S.`ID`, S.`last_epoch`, S.`ZeusMinutes`, S.`ZeusSuccessful`, U.`Email`
 					FROM sensor AS S, user AS U, location AS L
 					WHERE S.`ZeusMinutes` > 0 && S.`Prefix` = L.`Prefix` && L.`OwnerID` = U.`ID`
 				""".trimIndent()
@@ -55,7 +52,7 @@ object Zeus
 					ZeusEntry(
 	                    prefix = it.getString(1),
 	                    id = it.getInt(2),
-	                    dateTimeMax = it.getInt(3),
+	                    lastEpoch = it.getInt(3),
 	                    minutes = it.getInt(4),
 	                    successful = it.getInt(5) != 0,
 	                    email = it.getString(6)
@@ -66,7 +63,7 @@ object Zeus
 				for (entry in zeusEntries) {
 					try {
 						println("${entry.prefix}[${entry.id}]")
-						var delta = (Date().time / 1000).toInt() - entry.dateTimeMax
+						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
 						delta /= 60 // in minutes
 						val successful = delta <= entry.minutes
 						if (entry.successful != successful) {
@@ -74,7 +71,7 @@ object Zeus
 							val line = "${if (successful) "RESUMED" else "FAILED"}: ${entry.prefix}[${entry.id}] ($delta min)\n"
 							msg[entry.email] = (msg[entry.email] ?: "") + line
 							val successfulSQL = """
-								UPDATE sensor SET `ZeusSuccessful`=${if (successful) "1" else "0"} WHERE `Prefix`="${entry.prefix}" && `ID`=${entry.id};
+								UPDATE sensor SET `ZeusSuccessful`=${if (successful) "1" else "0"} WHERE `Prefix`='${entry.prefix}' && `ID`=${entry.id};
 							""".trimIndent()
 							md.executeUpdate(successfulSQL)
 						}
@@ -112,7 +109,7 @@ object Zeus
 	data class ZeusEntry(
 		val prefix: String,
 		val id: Int,
-		val dateTimeMax: Int = 0,
+		val lastEpoch: Int = 0,
 		val minutes: Int = 0,
 		val successful: Boolean = false,
 		val email: String = ""
@@ -121,10 +118,7 @@ object Zeus
 	/** Aggregate stats for one sensor's log rows */
 	data class ZeusStats(
 		val count: Int,
-		val dateTimeMin: Int,
-		val dateTimeMax: Int,
-		val valueMin: Float,
-		val valueMax: Float
+		val lastEpoch: Int
 	)
 
 }
