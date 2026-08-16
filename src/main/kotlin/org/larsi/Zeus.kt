@@ -72,9 +72,9 @@ object Zeus
 
 				// Check if values are outdated, per device (not per sensor -- sensor.ZeusMinutes/ZeusSuccessful are no longer read)
 				val zeusEntriesSQL = """
-					SELECT D.`prefix`, D.`device_id`, D.`last_epoch`, D.`zeus_minutes`, D.`zeus_successful`
-					FROM device AS D, location AS L
-					WHERE D.`zeus_minutes` > 0 && D.`prefix` = L.`Prefix`
+					SELECT `prefix`, `device_id`, `last_epoch`, `zeus_minutes`, `zeus_successful`
+					FROM device
+					WHERE `zeus_minutes` > 0
 				""".trimIndent()
 				zeusEntries = md.queryList(zeusEntriesSQL) {
 					ZeusEntry(
