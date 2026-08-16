@@ -3,13 +3,16 @@ package org.larsi
 import java.util.Date
 
 import org.larsi.util.MeteredDataConnector
+import org.larsi.util.Ntfy
 
 object Zeus
 {
+	const val NTFY_TOPIC = "larsi-zeus"
+
 	@JvmStatic
-	fun check(): MutableMap<String, String>
+	fun check(): MutableList<String>
 	{
-		val msg = mutableMapOf<String, String>()
+		val alerts = mutableListOf<String>()
 
 		try {
 			MeteredDataConnector("larsi-sensors").use { md ->
@@ -44,7 +47,7 @@ object Zeus
 
 				// Check if values are outdated
 				val zeusEntriesSQL = """
-					SELECT S.`Prefix`, S.`ID`, S.`last_epoch`, S.`ZeusMinutes`, S.`ZeusSuccessful`, U.`Email`
+					SELECT S.`Prefix`, S.`ID`, S.`last_epoch`, S.`ZeusMinutes`, S.`ZeusSuccessful`
 					FROM sensor AS S, user AS U, location AS L
 					WHERE S.`ZeusMinutes` > 0 && S.`Prefix` = L.`Prefix` && L.`OwnerID` = U.`ID`
 				""".trimIndent()
@@ -54,8 +57,7 @@ object Zeus
 	                    id = it.getInt(2),
 	                    lastEpoch = it.getInt(3),
 	                    minutes = it.getInt(4),
-	                    successful = it.getInt(5) != 0,
-	                    email = it.getString(6)
+	                    successful = it.getInt(5) != 0
 					)
 				}
 
@@ -67,9 +69,7 @@ object Zeus
 						delta /= 60 // in minutes
 						val successful = delta <= entry.minutes
 						if (entry.successful != successful) {
-							// email status change
-							val line = "${if (successful) "RESUMED" else "FAILED"}: ${entry.prefix}[${entry.id}] ($delta min)\n"
-							msg[entry.email] = (msg[entry.email] ?: "") + line
+							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${entry.id}] ($delta min)\n")
 							val successfulSQL = """
 								UPDATE sensor SET `ZeusSuccessful`=${if (successful) "1" else "0"} WHERE `Prefix`='${entry.prefix}' && `ID`=${entry.id};
 							""".trimIndent()
@@ -88,18 +88,17 @@ object Zeus
 
 		println()
 
-		return msg
+		return alerts
 	}
 
 	@JvmStatic
 	fun main(args: Array<String>)
 	{
-		// Check and send emails
-		//SendMail m = new SendMail(WeatherToolsConfig.get("email", "email"));
-		for (email in check().entries) {
-			println("${email.key}:")
-			println(email.value)
-			//m.send(email.getKey(), "Zeus Update", email.getValue());
+		val alerts = check()
+		if (alerts.isNotEmpty()) {
+			val message = alerts.joinToString("")
+			println(message)
+			Ntfy.publish(NTFY_TOPIC, "Zeus Update", message)
 		}
 
 		println("Done")
@@ -111,8 +110,7 @@ object Zeus
 		val id: Int,
 		val lastEpoch: Int = 0,
 		val minutes: Int = 0,
-		val successful: Boolean = false,
-		val email: String = ""
+		val successful: Boolean = false
 	)
 
 	/** Aggregate stats for one sensor's log rows */
