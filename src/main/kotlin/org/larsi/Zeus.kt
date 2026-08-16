@@ -28,8 +28,6 @@ object Zeus
 			e.printStackTrace()
 		}
 
-		println()
-
 		return alerts
 	}
 
@@ -126,6 +124,8 @@ object Zeus
 					e.printStackTrace()
 				}
 			}
+
+			println() // blank line separating this section's logging from what follows
 		}
 	}
 
@@ -194,6 +194,8 @@ object Zeus
 					e.printStackTrace()
 				}
 			}
+
+			println() // blank line separating this section's logging from what follows
 		}
 	}
 
