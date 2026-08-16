@@ -70,7 +70,7 @@ object Zeus
 					}
 				}
 
-				// Check if values are outdated, per device (not per sensor -- sensor.ZeusMinutes/ZeusSuccessful are no longer read)
+				// Check if values are outdated, per device
 				val zeusEntriesSQL = """
 					SELECT `prefix`, `device_id`, `last_epoch`, `zeus_minutes`, `zeus_successful`
 					FROM device
