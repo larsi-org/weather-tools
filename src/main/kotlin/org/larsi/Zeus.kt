@@ -45,11 +45,36 @@ object Zeus
 					}
 				}
 
-				// Check if values are outdated
+				// Roll each device's sensor stats up: last_epoch = latest of any of its sensors, count = sum of all of them
+				val deviceStatsSQL = """
+					SELECT `Prefix`, `device_id`, SUM(`Count`) AS `Count`, MAX(`last_epoch`) AS `LastEpoch`
+					FROM sensor
+					GROUP BY `Prefix`, `device_id`
+				""".trimIndent()
+				val deviceStats = md.queryList(deviceStatsSQL) {
+					ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3), it.getInt(4))
+				}
+
+				println("Aggregating stats for ${deviceStats.size} devices...")
+				for (entry in deviceStats) {
+					try {
+						println("${entry.prefix}[${entry.deviceId}]")
+						val updateSQL = """
+							UPDATE device SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
+							WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
+						""".trimIndent()
+						md.executeUpdate(updateSQL)
+					}
+					catch (e: Exception) {
+						e.printStackTrace()
+					}
+				}
+
+				// Check if values are outdated, per device (not per sensor -- sensor.ZeusMinutes/ZeusSuccessful are no longer read)
 				val zeusEntriesSQL = """
-					SELECT S.`Prefix`, S.`ID`, S.`last_epoch`, S.`ZeusMinutes`, S.`ZeusSuccessful`
-					FROM sensor AS S, user AS U, location AS L
-					WHERE S.`ZeusMinutes` > 0 && S.`Prefix` = L.`Prefix` && L.`OwnerID` = U.`ID`
+					SELECT D.`prefix`, D.`device_id`, D.`last_epoch`, D.`zeus_minutes`, D.`zeus_successful`
+					FROM device AS D, user AS U, location AS L
+					WHERE D.`zeus_minutes` > 0 && D.`prefix` = L.`Prefix` && L.`OwnerID` = U.`ID`
 				""".trimIndent()
 				zeusEntries = md.queryList(zeusEntriesSQL) {
 					ZeusEntry(
@@ -61,7 +86,7 @@ object Zeus
 					)
 				}
 
-				println("Checking ${zeusEntries.size} zeus entries...")
+				println("Checking ${zeusEntries.size} device zeus entries...")
 				for (entry in zeusEntries) {
 					try {
 						println("${entry.prefix}[${entry.id}]")
@@ -71,7 +96,7 @@ object Zeus
 						if (entry.successful != successful) {
 							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${entry.id}] ($delta min)\n")
 							val successfulSQL = """
-								UPDATE sensor SET `ZeusSuccessful`=${if (successful) "1" else "0"} WHERE `Prefix`='${entry.prefix}' && `ID`=${entry.id};
+								UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.id};
 							""".trimIndent()
 							md.executeUpdate(successfulSQL)
 						}
@@ -115,6 +140,14 @@ object Zeus
 
 	/** Aggregate stats for one sensor's log rows */
 	data class ZeusStats(
+		val count: Int,
+		val lastEpoch: Int
+	)
+
+	/** Sensor stats rolled up to one device */
+	data class ZeusDeviceStats(
+		val prefix: String,
+		val deviceId: Int,
 		val count: Int,
 		val lastEpoch: Int
 	)
