@@ -19,8 +19,9 @@ each:
 - **`Ish2.kt`** (plus `IshHarvester.kt`) — a manual backfill tool that downloads NOAA's
   historical "ISH" (Integrated Surface Hourly) archive and re-imports it, to patch gaps left by
   harvester downtime.
-- **`Zeus.kt`** — a monitoring job that tracks per-sensor data freshness (cached into `sensor`) and
-  rolls it up per-device, flagging devices that have stopped reporting.
+- **`Zeus.kt`** — a monitoring job that tracks data freshness for both `larsi-sensors` (per-sensor,
+  rolled up per-device) and `larsi-weather2` (per-station), flagging anything that's stopped
+  reporting.
 - **`dev/`** — assorted one-off developer utilities (station-list generation, data export/import,
   etc.).
 - **`util/`** — shared helpers: config loading, a JDBC connection/query helper, and psychrometric

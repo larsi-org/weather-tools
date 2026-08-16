@@ -111,6 +111,75 @@ object Zeus
 			e.printStackTrace()
 		}
 
+		try {
+			MeteredDataConnector("larsi-weather2").use { md ->
+				// No per-station `sensor` table here (weather2's `sensor` is 14 rows of shared
+				// display metadata, not per-instance data) and no `user` table (no per-station
+				// ownership) -- station stats come straight from `log`, one rollup instead of two.
+				val statsSQL = """
+					SELECT `station`, COUNT(*) AS `Count`, MAX(`epoch`) AS `LastEpoch`
+					FROM log
+					GROUP BY `station`
+				""".trimIndent()
+				val stats = md.queryList(statsSQL) {
+					ZeusLocationStats(it.getString(1), it.getInt(2), it.getInt(3))
+				}
+
+				println("Aggregating stats for ${stats.size} weather2 stations...")
+				for (entry in stats) {
+					try {
+						println(entry.station)
+						val updateSQL = """
+							UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
+							WHERE `Prefix`='${entry.station.lowercase()}'
+						""".trimIndent()
+						md.executeUpdate(updateSQL)
+					}
+					catch (e: Exception) {
+						e.printStackTrace()
+					}
+				}
+
+				// Check if values are outdated, per station
+				val zeusEntriesSQL = """
+					SELECT `Prefix`, `last_epoch`, `zeus_minutes`, `zeus_successful`
+					FROM location
+					WHERE `zeus_minutes` > 0
+				""".trimIndent()
+				val zeusEntries = md.queryList(zeusEntriesSQL) {
+					ZeusStationEntry(
+						prefix = it.getString(1),
+						lastEpoch = it.getInt(2),
+						minutes = it.getInt(3),
+						successful = it.getInt(4) != 0
+					)
+				}
+
+				println("Checking ${zeusEntries.size} weather2 zeus entries...")
+				for (entry in zeusEntries) {
+					try {
+						println(entry.prefix)
+						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
+						delta /= 60 // in minutes
+						val successful = delta <= entry.minutes
+						if (entry.successful != successful) {
+							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix} ($delta min)\n")
+							val successfulSQL = """
+								UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `Prefix`='${entry.prefix}';
+							""".trimIndent()
+							md.executeUpdate(successfulSQL)
+						}
+					}
+					catch (e: Exception) {
+						e.printStackTrace()
+					}
+				}
+			}
+		}
+		catch (e: Exception) {
+			e.printStackTrace()
+		}
+
 		println()
 
 		return alerts
@@ -150,6 +219,21 @@ object Zeus
 		val deviceId: Int,
 		val count: Int,
 		val lastEpoch: Int
+	)
+
+	/** Aggregate stats for one weather2 station's log rows */
+	data class ZeusLocationStats(
+		val station: String,
+		val count: Int,
+		val lastEpoch: Int
+	)
+
+	/** Keeps one weather2 zeus entry (no numeric id -- Prefix is the station's own key) */
+	data class ZeusStationEntry(
+		val prefix: String,
+		val lastEpoch: Int,
+		val minutes: Int,
+		val successful: Boolean
 	)
 
 }
