@@ -142,16 +142,16 @@ object Zeus
 				GROUP BY `station`
 			""".trimIndent()
 			val stats = md.queryList(statsSQL) {
-				ZeusLocationStats(it.getString(1), it.getInt(2), it.getInt(3))
+				ZeusDeviceStats(prefix = it.getString(1), count = it.getInt(2), lastEpoch = it.getInt(3))
 			}
 
 			println("Aggregating stats for ${stats.size} weather2 stations...")
 			for (entry in stats) {
 				try {
-					println(entry.station)
+					println(entry.prefix)
 					val updateSQL = """
 						UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
-						WHERE `Prefix`='${entry.station.lowercase()}'
+						WHERE `Prefix`='${entry.prefix.lowercase()}'
 					""".trimIndent()
 					md.executeUpdate(updateSQL)
 				}
@@ -167,7 +167,7 @@ object Zeus
 				WHERE `zeus_minutes` > 0
 			""".trimIndent()
 			val zeusEntries = md.queryList(zeusEntriesSQL) {
-				ZeusStationEntry(
+				ZeusEntry(
 					prefix = it.getString(1),
 					lastEpoch = it.getInt(2),
 					minutes = it.getInt(3),
@@ -212,10 +212,11 @@ object Zeus
 		println("Done")
 	}
 
-	/** Keeps one zeus entry */
+	/** Keeps one zeus entry. A weather2 station is just a location with a single implicit
+	 *  device, so it reuses this with `id` left at its default. */
 	data class ZeusEntry(
 		val prefix: String,
-		val id: Int,
+		val id: Int = 0,
 		val lastEpoch: Int = 0,
 		val minutes: Int = 0,
 		val successful: Boolean = false
@@ -227,27 +228,13 @@ object Zeus
 		val lastEpoch: Int
 	)
 
-	/** Sensor stats rolled up to one device */
+	/** Sensor stats rolled up to one device. A weather2 station is just a location with a
+	 *  single implicit device, so it reuses this with `deviceId` left at its default. */
 	data class ZeusDeviceStats(
 		val prefix: String,
-		val deviceId: Int,
+		val deviceId: Int = 0,
 		val count: Int,
 		val lastEpoch: Int
-	)
-
-	/** Aggregate stats for one weather2 station's log rows */
-	data class ZeusLocationStats(
-		val station: String,
-		val count: Int,
-		val lastEpoch: Int
-	)
-
-	/** Keeps one weather2 zeus entry (no numeric id -- Prefix is the station's own key) */
-	data class ZeusStationEntry(
-		val prefix: String,
-		val lastEpoch: Int,
-		val minutes: Int,
-		val successful: Boolean
 	)
 
 }
