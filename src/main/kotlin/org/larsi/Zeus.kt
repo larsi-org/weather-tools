@@ -15,166 +15,14 @@ object Zeus
 		val alerts = mutableListOf<String>()
 
 		try {
-			MeteredDataConnector("larsi-sensors").use { md ->
-				var zeusEntries = md.queryList("SELECT `Prefix`, `ID` FROM `sensor`") {
-					ZeusEntry(it.getString(1), it.getInt(2))
-				}
-
-				println("Checking ${zeusEntries.size} sensor entries...")
-				for (entry in zeusEntries) {
-					try {
-						println("${entry.prefix}[${entry.id}]")
-						val statsSQL = """
-							SELECT COUNT(*) AS `Count`, MAX(`DateTime`) AS `LastEpoch`
-							FROM ${entry.prefix}_log
-							WHERE `SensorID`=${entry.id}
-						""".trimIndent()
-						val stats = md.queryList(statsSQL) {
-							ZeusStats(it.getInt(1), it.getInt(2))
-						}.first()
-						val count = stats.count
-						val lastEpoch = stats.lastEpoch
-						val updateSQL = """
-							UPDATE sensor SET `Count`=$count, `last_epoch`=$lastEpoch
-							WHERE `Prefix`='${entry.prefix}' && `ID`=${entry.id}
-						""".trimIndent()
-						md.executeUpdate(updateSQL)
-					}
-					catch (e: Exception) {
-						e.printStackTrace()
-					}
-				}
-
-				// Roll each device's sensor stats up: last_epoch = latest of any of its sensors, count = sum of all of them
-				val deviceStatsSQL = """
-					SELECT `Prefix`, `device_id`, SUM(`Count`) AS `Count`, MAX(`last_epoch`) AS `LastEpoch`
-					FROM sensor
-					GROUP BY `Prefix`, `device_id`
-				""".trimIndent()
-				val deviceStats = md.queryList(deviceStatsSQL) {
-					ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3), it.getInt(4))
-				}
-
-				println("Aggregating stats for ${deviceStats.size} devices...")
-				for (entry in deviceStats) {
-					try {
-						println("${entry.prefix}[${entry.deviceId}]")
-						val updateSQL = """
-							UPDATE device SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
-							WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
-						""".trimIndent()
-						md.executeUpdate(updateSQL)
-					}
-					catch (e: Exception) {
-						e.printStackTrace()
-					}
-				}
-
-				// Check if values are outdated, per device
-				val zeusEntriesSQL = """
-					SELECT `prefix`, `device_id`, `last_epoch`, `zeus_minutes`, `zeus_successful`
-					FROM device
-					WHERE `zeus_minutes` > 0
-				""".trimIndent()
-				zeusEntries = md.queryList(zeusEntriesSQL) {
-					ZeusEntry(
-	                    prefix = it.getString(1),
-	                    id = it.getInt(2),
-	                    lastEpoch = it.getInt(3),
-	                    minutes = it.getInt(4),
-	                    successful = it.getInt(5) != 0
-					)
-				}
-
-				println("Checking ${zeusEntries.size} device zeus entries...")
-				for (entry in zeusEntries) {
-					try {
-						println("${entry.prefix}[${entry.id}]")
-						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
-						delta /= 60 // in minutes
-						val successful = delta <= entry.minutes
-						if (entry.successful != successful) {
-							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${entry.id}] ($delta min)\n")
-							val successfulSQL = """
-								UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.id};
-							""".trimIndent()
-							md.executeUpdate(successfulSQL)
-						}
-					}
-					catch (e: Exception) {
-						e.printStackTrace()
-					}
-				}
-			}
+			checkSensors(alerts)
 		}
 		catch (e: Exception) {
 			e.printStackTrace()
 		}
 
 		try {
-			MeteredDataConnector("larsi-weather2").use { md ->
-				// No per-station `sensor` table here (weather2's `sensor` is 14 rows of shared
-				// display metadata, not per-instance data) and no `user` table (no per-station
-				// ownership) -- station stats come straight from `log`, one rollup instead of two.
-				val statsSQL = """
-					SELECT `station`, COUNT(*) AS `Count`, MAX(`epoch`) AS `LastEpoch`
-					FROM log
-					GROUP BY `station`
-				""".trimIndent()
-				val stats = md.queryList(statsSQL) {
-					ZeusLocationStats(it.getString(1), it.getInt(2), it.getInt(3))
-				}
-
-				println("Aggregating stats for ${stats.size} weather2 stations...")
-				for (entry in stats) {
-					try {
-						println(entry.station)
-						val updateSQL = """
-							UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
-							WHERE `Prefix`='${entry.station.lowercase()}'
-						""".trimIndent()
-						md.executeUpdate(updateSQL)
-					}
-					catch (e: Exception) {
-						e.printStackTrace()
-					}
-				}
-
-				// Check if values are outdated, per station
-				val zeusEntriesSQL = """
-					SELECT `Prefix`, `last_epoch`, `zeus_minutes`, `zeus_successful`
-					FROM location
-					WHERE `zeus_minutes` > 0
-				""".trimIndent()
-				val zeusEntries = md.queryList(zeusEntriesSQL) {
-					ZeusStationEntry(
-						prefix = it.getString(1),
-						lastEpoch = it.getInt(2),
-						minutes = it.getInt(3),
-						successful = it.getInt(4) != 0
-					)
-				}
-
-				println("Checking ${zeusEntries.size} weather2 zeus entries...")
-				for (entry in zeusEntries) {
-					try {
-						println(entry.prefix)
-						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
-						delta /= 60 // in minutes
-						val successful = delta <= entry.minutes
-						if (entry.successful != successful) {
-							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix} ($delta min)\n")
-							val successfulSQL = """
-								UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `Prefix`='${entry.prefix}';
-							""".trimIndent()
-							md.executeUpdate(successfulSQL)
-						}
-					}
-					catch (e: Exception) {
-						e.printStackTrace()
-					}
-				}
-			}
+			checkWeather(alerts)
 		}
 		catch (e: Exception) {
 			e.printStackTrace()
@@ -183,6 +31,170 @@ object Zeus
 		println()
 
 		return alerts
+	}
+
+	/** larsi-sensors: per-sensor stats -> rolled up per-device -> per-device alerting */
+	private fun checkSensors(alerts: MutableList<String>)
+	{
+		MeteredDataConnector("larsi-sensors").use { md ->
+			var zeusEntries = md.queryList("SELECT `Prefix`, `ID` FROM `sensor`") {
+				ZeusEntry(it.getString(1), it.getInt(2))
+			}
+
+			println("Checking ${zeusEntries.size} sensor entries...")
+			for (entry in zeusEntries) {
+				try {
+					println("${entry.prefix}[${entry.id}]")
+					val statsSQL = """
+						SELECT COUNT(*) AS `Count`, MAX(`DateTime`) AS `LastEpoch`
+						FROM ${entry.prefix}_log
+						WHERE `SensorID`=${entry.id}
+					""".trimIndent()
+					val stats = md.queryList(statsSQL) {
+						ZeusStats(it.getInt(1), it.getInt(2))
+					}.first()
+					val count = stats.count
+					val lastEpoch = stats.lastEpoch
+					val updateSQL = """
+						UPDATE sensor SET `Count`=$count, `last_epoch`=$lastEpoch
+						WHERE `Prefix`='${entry.prefix}' && `ID`=${entry.id}
+					""".trimIndent()
+					md.executeUpdate(updateSQL)
+				}
+				catch (e: Exception) {
+					e.printStackTrace()
+				}
+			}
+
+			// Roll each device's sensor stats up: last_epoch = latest of any of its sensors, count = sum of all of them
+			val deviceStatsSQL = """
+				SELECT `Prefix`, `device_id`, SUM(`Count`) AS `Count`, MAX(`last_epoch`) AS `LastEpoch`
+				FROM sensor
+				GROUP BY `Prefix`, `device_id`
+			""".trimIndent()
+			val deviceStats = md.queryList(deviceStatsSQL) {
+				ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3), it.getInt(4))
+			}
+
+			println("Aggregating stats for ${deviceStats.size} devices...")
+			for (entry in deviceStats) {
+				try {
+					println("${entry.prefix}[${entry.deviceId}]")
+					val updateSQL = """
+						UPDATE device SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
+						WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
+					""".trimIndent()
+					md.executeUpdate(updateSQL)
+				}
+				catch (e: Exception) {
+					e.printStackTrace()
+				}
+			}
+
+			// Check if values are outdated, per device
+			val zeusEntriesSQL = """
+				SELECT `prefix`, `device_id`, `last_epoch`, `zeus_minutes`, `zeus_successful`
+				FROM device
+				WHERE `zeus_minutes` > 0
+			""".trimIndent()
+			zeusEntries = md.queryList(zeusEntriesSQL) {
+				ZeusEntry(
+                    prefix = it.getString(1),
+                    id = it.getInt(2),
+                    lastEpoch = it.getInt(3),
+                    minutes = it.getInt(4),
+                    successful = it.getInt(5) != 0
+				)
+			}
+
+			println("Checking ${zeusEntries.size} device zeus entries...")
+			for (entry in zeusEntries) {
+				try {
+					println("${entry.prefix}[${entry.id}]")
+					var delta = (Date().time / 1000).toInt() - entry.lastEpoch
+					delta /= 60 // in minutes
+					val successful = delta <= entry.minutes
+					if (entry.successful != successful) {
+						alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${entry.id}] ($delta min)\n")
+						val successfulSQL = """
+							UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.id};
+						""".trimIndent()
+						md.executeUpdate(successfulSQL)
+					}
+				}
+				catch (e: Exception) {
+					e.printStackTrace()
+				}
+			}
+		}
+	}
+
+	/** larsi-weather2: per-station stats and alerting -- flatter than checkSensors, see CLAUDE.md */
+	private fun checkWeather(alerts: MutableList<String>)
+	{
+		MeteredDataConnector("larsi-weather2").use { md ->
+			// No per-station `sensor` table here (weather2's `sensor` is 14 rows of shared
+			// display metadata, not per-instance data) and no `user` table (no per-station
+			// ownership) -- station stats come straight from `log`, one rollup instead of two.
+			val statsSQL = """
+				SELECT `station`, COUNT(*) AS `Count`, MAX(`epoch`) AS `LastEpoch`
+				FROM log
+				GROUP BY `station`
+			""".trimIndent()
+			val stats = md.queryList(statsSQL) {
+				ZeusLocationStats(it.getString(1), it.getInt(2), it.getInt(3))
+			}
+
+			println("Aggregating stats for ${stats.size} weather2 stations...")
+			for (entry in stats) {
+				try {
+					println(entry.station)
+					val updateSQL = """
+						UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
+						WHERE `Prefix`='${entry.station.lowercase()}'
+					""".trimIndent()
+					md.executeUpdate(updateSQL)
+				}
+				catch (e: Exception) {
+					e.printStackTrace()
+				}
+			}
+
+			// Check if values are outdated, per station
+			val zeusEntriesSQL = """
+				SELECT `Prefix`, `last_epoch`, `zeus_minutes`, `zeus_successful`
+				FROM location
+				WHERE `zeus_minutes` > 0
+			""".trimIndent()
+			val zeusEntries = md.queryList(zeusEntriesSQL) {
+				ZeusStationEntry(
+					prefix = it.getString(1),
+					lastEpoch = it.getInt(2),
+					minutes = it.getInt(3),
+					successful = it.getInt(4) != 0
+				)
+			}
+
+			println("Checking ${zeusEntries.size} weather2 zeus entries...")
+			for (entry in zeusEntries) {
+				try {
+					println(entry.prefix)
+					var delta = (Date().time / 1000).toInt() - entry.lastEpoch
+					delta /= 60 // in minutes
+					val successful = delta <= entry.minutes
+					if (entry.successful != successful) {
+						alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix} ($delta min)\n")
+						val successfulSQL = """
+							UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `Prefix`='${entry.prefix}';
+						""".trimIndent()
+						md.executeUpdate(successfulSQL)
+					}
+				}
+				catch (e: Exception) {
+					e.printStackTrace()
+				}
+			}
+		}
 	}
 
 	@JvmStatic
