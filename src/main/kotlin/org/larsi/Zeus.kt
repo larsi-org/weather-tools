@@ -44,9 +44,9 @@ object Zeus
 				try {
 					println("${entry.prefix}[${entry.id}]")
 					val statsSQL = """
-						SELECT COUNT(*) AS `count`, MAX(`DateTime`) AS `last_epoch`
+						SELECT COUNT(*) AS `count`, MAX(`epoch`) AS `last_epoch`
 						FROM ${entry.prefix}_log
-						WHERE `SensorID`=${entry.id}
+						WHERE `id`=${entry.id}
 					""".trimIndent()
 					val stats = md.queryList(statsSQL) {
 						ZeusStats(it.getInt(1), it.getInt(2))
