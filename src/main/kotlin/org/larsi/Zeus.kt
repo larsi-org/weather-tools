@@ -62,20 +62,22 @@ object Zeus
 				}
 			}
 
-			// Roll each device's sensor stats up: last_epoch = latest of any of its sensors, count = sum of all of them
+			// Roll each device's sensor stats up: last_epoch = latest of any of its sensors.
+			// device.last_epoch itself is ingest-owned by sensors/log.php now, not Zeus -- this
+			// rollup only exists to compute the alerting delta below, never written back.
 			val deviceStatsSQL = """
-				SELECT `Prefix`, `device_id`, SUM(`Count`) AS `count`, MAX(`last_epoch`) AS `last_epoch`
+				SELECT `Prefix`, `device_id`, MAX(`last_epoch`) AS `last_epoch`
 				FROM sensor
 				GROUP BY `Prefix`, `device_id`
 			""".trimIndent()
 			val deviceStats = md.queryList(deviceStatsSQL) {
-				ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3), it.getInt(4))
+				ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3))
 			}
 
 			// device_name/zeus_minutes/zeus_successful, keyed by (prefix, device_id) -- only
 			// devices with zeus_minutes > 0 are monitored at all; joined against `deviceStats`
 			// below rather than checked in its own loop, since a device absent from `sensor` has
-			// nothing to update or check this run anyway.
+			// nothing to check this run anyway.
 			val zeusConfigSQL = """
 				SELECT `prefix`, `device_id`, `device_name`, `zeus_minutes`, `zeus_successful`
 				FROM device
@@ -91,12 +93,11 @@ object Zeus
 				)
 			}.associateBy { Pair(it.prefix, it.id) }
 
-			println("Aggregating stats for ${deviceStats.size} devices...")
+			println("Checking ${deviceStats.size} devices...")
 			for (entry in deviceStats) {
 				try {
 					println("${entry.prefix}[${entry.deviceId}]")
 
-					var successfulSet = ""
 					val zeusInfo = zeusConfig[Pair(entry.prefix, entry.deviceId)]
 					if (zeusInfo != null) {
 						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
@@ -104,15 +105,13 @@ object Zeus
 						val successful = delta <= zeusInfo.minutes
 						if (zeusInfo.successful != successful) {
 							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${zeusInfo.deviceName}] ($delta min)\n")
-							successfulSet = ", `zeus_successful`=${if (successful) "1" else "0"}"
+							val updateSQL = """
+								UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"}
+								WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
+							""".trimIndent()
+							md.executeUpdate(updateSQL)
 						}
 					}
-
-					val updateSQL = """
-						UPDATE device SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}$successfulSet
-						WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
-					""".trimIndent()
-					md.executeUpdate(updateSQL)
 				}
 				catch (e: Exception) {
 					e.printStackTrace()
@@ -129,14 +128,16 @@ object Zeus
 		MeteredDataConnector("larsi-weather2").use { md ->
 			// No per-station `sensor` table here (weather2's `sensor` is 14 rows of shared
 			// display metadata, not per-instance data) and no `user` table (no per-station
-			// ownership) -- station stats come straight from `log`, one rollup instead of two.
+			// ownership), so there's no per-sensor stats table to roll up from either -- this
+			// queries `log` directly just to compute the alerting delta below. location.last_epoch
+			// itself is ingest-owned by GeoNames2 now, not Zeus, so it's never written back here.
 			val statsSQL = """
-				SELECT `station`, COUNT(*) AS `count`, MAX(`epoch`) AS `last_epoch`
+				SELECT `station`, MAX(`epoch`) AS `last_epoch`
 				FROM log
 				GROUP BY `station`
 			""".trimIndent()
 			val stats = md.queryList(statsSQL) {
-				ZeusDeviceStats(prefix = it.getString(1), count = it.getInt(2), lastEpoch = it.getInt(3))
+				ZeusDeviceStats(prefix = it.getString(1), lastEpoch = it.getInt(2))
 			}
 
 			// zeus_minutes/zeus_successful, keyed by lowercase Prefix -- only stations with
@@ -152,13 +153,12 @@ object Zeus
 				ZeusEntry(prefix = it.getString(1), minutes = it.getInt(2), successful = it.getInt(3) != 0)
 			}.associateBy { it.prefix }
 
-			println("Aggregating stats for ${stats.size} weather2 stations...")
+			println("Checking ${stats.size} weather2 stations...")
 			for (entry in stats) {
 				try {
 					println(entry.prefix)
 					val prefix = entry.prefix.lowercase()
 
-					var successfulSet = ""
 					val zeusInfo = zeusConfig[prefix]
 					if (zeusInfo != null) {
 						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
@@ -166,15 +166,13 @@ object Zeus
 						val successful = delta <= zeusInfo.minutes
 						if (zeusInfo.successful != successful) {
 							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: $prefix ($delta min)\n")
-							successfulSet = ", `zeus_successful`=${if (successful) "1" else "0"}"
+							val updateSQL = """
+								UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"}
+								WHERE `Prefix`='$prefix'
+							""".trimIndent()
+							md.executeUpdate(updateSQL)
 						}
 					}
-
-					val updateSQL = """
-						UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}$successfulSet
-						WHERE `Prefix`='$prefix'
-					""".trimIndent()
-					md.executeUpdate(updateSQL)
 				}
 				catch (e: Exception) {
 					e.printStackTrace()
@@ -227,12 +225,12 @@ object Zeus
 		val lastEpoch: Int
 	)
 
-	/** Sensor stats rolled up to one device. A weather2 station is just a location with a
-	 *  single implicit device, so it reuses this with `deviceId` left at its default. */
+	/** Last-logged epoch rolled up to one device (max across its sensors). A weather2 station is
+	 *  just a location with a single implicit device, so it reuses this with `deviceId` left at
+	 *  its default. */
 	data class ZeusDeviceStats(
 		val prefix: String,
 		val deviceId: Int = 0,
-		val count: Int,
 		val lastEpoch: Int
 	)
 
