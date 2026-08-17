@@ -9,29 +9,24 @@ object Zeus
 {
 	const val NTFY_TOPIC = "larsi-zeus"
 
+	/** Both DBs live on the same GoDaddy host/credentials, so a connection failure on one almost
+	 *  always means the other would fail too (e.g. an IP whitelist lapse) -- stop at the first
+	 *  failure instead of trying both and duplicating the same error. */
 	@JvmStatic
 	fun check(): ZeusCheckResult
 	{
 		val alerts = mutableListOf<String>()
-		val dbErrors = mutableListOf<String>()
 
 		try {
 			checkSensors(alerts)
-		}
-		catch (e: Exception) {
-			e.printStackTrace()
-			dbErrors.add("larsi-sensors: ${e.message}\n")
-		}
-
-		try {
 			checkWeather(alerts)
 		}
 		catch (e: Exception) {
 			e.printStackTrace()
-			dbErrors.add("larsi-weather2: ${e.message}\n")
+			return ZeusCheckResult(alerts, "DB connection was refused")
 		}
 
-		return ZeusCheckResult(alerts, dbErrors)
+		return ZeusCheckResult(alerts)
 	}
 
 	/** larsi-sensors: per-sensor stats -> rolled up per-device -> per-device alerting */
@@ -199,21 +194,20 @@ object Zeus
 			println(message)
 			Ntfy.publish(NTFY_TOPIC, "Zeus Update", message)
 		}
-		if (result.dbErrors.isNotEmpty()) {
-			val message = result.dbErrors.joinToString("")
-			println(message)
-			Ntfy.publish(NTFY_TOPIC, "🚨 Zeus DB Error", message, priority = "urgent", tags = "rotating_light")
+		if (result.dbError != null) {
+			println(result.dbError)
+			Ntfy.publish(NTFY_TOPIC, "Zeus DB Error", result.dbError, priority = "urgent", tags = "rotating_light")
 		}
 
 		println("Done")
 	}
 
-	/** Result of a `check()` run: normal FAILED/RESUMED alerts, plus any DB-unreachable errors
-	 *  (e.g. GoDaddy IP whitelist lapsed) that aborted a whole `checkSensors`/`checkWeather` pass --
-	 *  kept separate so the latter can be pushed as its own urgent/red ntfy notification. */
+	/** Result of a `check()` run: normal FAILED/RESUMED alerts, plus a DB-unreachable error (e.g.
+	 *  GoDaddy IP whitelist lapsed) if one aborted the run -- kept separate so the latter can be
+	 *  pushed as its own urgent/red ntfy notification. */
 	data class ZeusCheckResult(
 		val alerts: List<String>,
-		val dbErrors: List<String>
+		val dbError: String? = null
 	)
 
 	/** Keeps one zeus entry. A weather2 station is just a location with a single implicit
