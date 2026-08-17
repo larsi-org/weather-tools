@@ -33,7 +33,7 @@ object Zeus
 	private fun checkSensors(alerts: MutableList<String>)
 	{
 		MeteredDataConnector("larsi-sensors").use { md ->
-			val zeusEntries = md.queryList("SELECT `Prefix`, `ID` FROM `sensor`") {
+			val zeusEntries = md.queryList("SELECT `prefix`, `channel` FROM `sensor`") {
 				ZeusEntry(it.getString(1), it.getInt(2))
 			}
 
@@ -52,8 +52,8 @@ object Zeus
 					val count = stats.count
 					val lastEpoch = stats.lastEpoch
 					val updateSQL = """
-						UPDATE sensor SET `Count`=$count, `last_epoch`=$lastEpoch
-						WHERE `Prefix`='${entry.prefix}' && `ID`=${entry.id}
+						UPDATE sensor SET `count`=$count, `last_epoch`=$lastEpoch
+						WHERE `prefix`='${entry.prefix}' && `channel`=${entry.id}
 					""".trimIndent()
 					md.executeUpdate(updateSQL)
 				}
@@ -66,9 +66,9 @@ object Zeus
 			// device.last_epoch itself is ingest-owned by sensors/log.php now, not Zeus -- this
 			// rollup only exists to compute the alerting delta below, never written back.
 			val deviceStatsSQL = """
-				SELECT `Prefix`, `device_id`, MAX(`last_epoch`) AS `last_epoch`
+				SELECT `prefix`, `device_id`, MAX(`last_epoch`) AS `last_epoch`
 				FROM sensor
-				GROUP BY `Prefix`, `device_id`
+				GROUP BY `prefix`, `device_id`
 			""".trimIndent()
 			val deviceStats = md.queryList(deviceStatsSQL) {
 				ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3))
