@@ -91,7 +91,7 @@ object Zeus
 
 			// Check if values are outdated, per device
 			val zeusEntriesSQL = """
-				SELECT `prefix`, `device_id`, `last_epoch`, `zeus_minutes`, `zeus_successful`
+				SELECT `prefix`, `device_id`, `device_name`, `last_epoch`, `zeus_minutes`, `zeus_successful`
 				FROM device
 				WHERE `zeus_minutes` > 0
 			""".trimIndent()
@@ -99,21 +99,22 @@ object Zeus
 				ZeusEntry(
                     prefix = it.getString(1),
                     id = it.getInt(2),
-                    lastEpoch = it.getInt(3),
-                    minutes = it.getInt(4),
-                    successful = it.getInt(5) != 0
+                    deviceName = it.getString(3),
+                    lastEpoch = it.getInt(4),
+                    minutes = it.getInt(5),
+                    successful = it.getInt(6) != 0
 				)
 			}
 
 			println("Checking ${zeusEntries.size} device zeus entries...")
 			for (entry in zeusEntries) {
 				try {
-					println("${entry.prefix}[${entry.id}]")
+					println("${entry.prefix}[${entry.deviceName}]")
 					var delta = (Date().time / 1000).toInt() - entry.lastEpoch
 					delta /= 60 // in minutes
 					val successful = delta <= entry.minutes
 					if (entry.successful != successful) {
-						alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${entry.id}] ($delta min)\n")
+						alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${entry.deviceName}] ($delta min)\n")
 						val successfulSQL = """
 							UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.id};
 						""".trimIndent()
@@ -213,10 +214,11 @@ object Zeus
 	}
 
 	/** Keeps one zeus entry. A weather2 station is just a location with a single implicit
-	 *  device, so it reuses this with `id` left at its default. */
+	 *  device, so it reuses this with `id`/`deviceName` left at their defaults. */
 	data class ZeusEntry(
 		val prefix: String,
 		val id: Int = 0,
+		val deviceName: String = "",
 		val lastEpoch: Int = 0,
 		val minutes: Int = 0,
 		val successful: Boolean = false
