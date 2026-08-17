@@ -100,12 +100,8 @@ object Zeus
 			for (entry in deviceStats) {
 				try {
 					println("${entry.prefix}[${entry.deviceId}]")
-					val updateSQL = """
-						UPDATE device SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
-						WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
-					""".trimIndent()
-					md.executeUpdate(updateSQL)
 
+					var successfulSet = ""
 					val zeusInfo = zeusConfig[Pair(entry.prefix, entry.deviceId)]
 					if (zeusInfo != null) {
 						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
@@ -113,12 +109,15 @@ object Zeus
 						val successful = delta <= zeusInfo.minutes
 						if (zeusInfo.successful != successful) {
 							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${zeusInfo.deviceName}] ($delta min)\n")
-							val successfulSQL = """
-								UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId};
-							""".trimIndent()
-							md.executeUpdate(successfulSQL)
+							successfulSet = ", `zeus_successful`=${if (successful) "1" else "0"}"
 						}
 					}
+
+					val updateSQL = """
+						UPDATE device SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}$successfulSet
+						WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
+					""".trimIndent()
+					md.executeUpdate(updateSQL)
 				}
 				catch (e: Exception) {
 					e.printStackTrace()
