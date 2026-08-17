@@ -105,12 +105,14 @@ object Zeus
 						val successful = delta <= zeusInfo.minutes
 						if (zeusInfo.successful != successful) {
 							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${zeusInfo.deviceName}] ($delta min)\n")
-							val updateSQL = """
-								UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"}
-								WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
-							""".trimIndent()
-							md.executeUpdate(updateSQL)
 						}
+						// Written every run, even when unchanged -- simpler to read than gating
+						// the write on the same condition that gates the alert.
+						val updateSQL = """
+							UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"}
+							WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
+						""".trimIndent()
+						md.executeUpdate(updateSQL)
 					}
 				}
 				catch (e: Exception) {
@@ -166,12 +168,14 @@ object Zeus
 						val successful = delta <= zeusInfo.minutes
 						if (zeusInfo.successful != successful) {
 							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: $prefix ($delta min)\n")
-							val updateSQL = """
-								UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"}
-								WHERE `Prefix`='$prefix'
-							""".trimIndent()
-							md.executeUpdate(updateSQL)
 						}
+						// Written every run, even when unchanged -- simpler to read than gating
+						// the write on the same condition that gates the alert.
+						val updateSQL = """
+							UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"}
+							WHERE `Prefix`='$prefix'
+						""".trimIndent()
+						md.executeUpdate(updateSQL)
 					}
 				}
 				catch (e: Exception) {
