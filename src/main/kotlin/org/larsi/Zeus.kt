@@ -38,7 +38,7 @@ object Zeus
 	private fun checkSensors(alerts: MutableList<String>)
 	{
 		MeteredDataConnector("larsi-sensors").use { md ->
-			var zeusEntries = md.queryList("SELECT `Prefix`, `ID` FROM `sensor`") {
+			val zeusEntries = md.queryList("SELECT `Prefix`, `ID` FROM `sensor`") {
 				ZeusEntry(it.getString(1), it.getInt(2))
 			}
 
@@ -77,6 +77,25 @@ object Zeus
 				ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3), it.getInt(4))
 			}
 
+			// device_name/zeus_minutes/zeus_successful, keyed by (prefix, device_id) -- only
+			// devices with zeus_minutes > 0 are monitored at all; joined against `deviceStats`
+			// below rather than checked in its own loop, since a device absent from `sensor` has
+			// nothing to update or check this run anyway.
+			val zeusConfigSQL = """
+				SELECT `prefix`, `device_id`, `device_name`, `zeus_minutes`, `zeus_successful`
+				FROM device
+				WHERE `zeus_minutes` > 0
+			""".trimIndent()
+			val zeusConfig = md.queryList(zeusConfigSQL) {
+				ZeusEntry(
+                    prefix = it.getString(1),
+                    id = it.getInt(2),
+                    deviceName = it.getString(3),
+                    minutes = it.getInt(4),
+                    successful = it.getInt(5) != 0
+				)
+			}.associateBy { Pair(it.prefix, it.id) }
+
 			println("Aggregating stats for ${deviceStats.size} devices...")
 			for (entry in deviceStats) {
 				try {
@@ -86,42 +105,19 @@ object Zeus
 						WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
 					""".trimIndent()
 					md.executeUpdate(updateSQL)
-				}
-				catch (e: Exception) {
-					e.printStackTrace()
-				}
-			}
 
-			// Check if values are outdated, per device
-			val zeusEntriesSQL = """
-				SELECT `prefix`, `device_id`, `device_name`, `last_epoch`, `zeus_minutes`, `zeus_successful`
-				FROM device
-				WHERE `zeus_minutes` > 0
-			""".trimIndent()
-			zeusEntries = md.queryList(zeusEntriesSQL) {
-				ZeusEntry(
-                    prefix = it.getString(1),
-                    id = it.getInt(2),
-                    deviceName = it.getString(3),
-                    lastEpoch = it.getInt(4),
-                    minutes = it.getInt(5),
-                    successful = it.getInt(6) != 0
-				)
-			}
-
-			println("Checking ${zeusEntries.size} device zeus entries...")
-			for (entry in zeusEntries) {
-				try {
-					println("${entry.prefix}[${entry.deviceName}]")
-					var delta = (Date().time / 1000).toInt() - entry.lastEpoch
-					delta /= 60 // in minutes
-					val successful = delta <= entry.minutes
-					if (entry.successful != successful) {
-						alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${entry.deviceName}] ($delta min)\n")
-						val successfulSQL = """
-							UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.id};
-						""".trimIndent()
-						md.executeUpdate(successfulSQL)
+					val zeusInfo = zeusConfig[Pair(entry.prefix, entry.deviceId)]
+					if (zeusInfo != null) {
+						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
+						delta /= 60 // in minutes
+						val successful = delta <= zeusInfo.minutes
+						if (zeusInfo.successful != successful) {
+							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix}[${zeusInfo.deviceName}] ($delta min)\n")
+							val successfulSQL = """
+								UPDATE device SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId};
+							""".trimIndent()
+							md.executeUpdate(successfulSQL)
+						}
 					}
 				}
 				catch (e: Exception) {
