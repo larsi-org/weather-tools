@@ -44,7 +44,7 @@ object Zeus
 				try {
 					println("${entry.prefix}[${entry.id}]")
 					val statsSQL = """
-						SELECT COUNT(*) AS `Count`, MAX(`DateTime`) AS `LastEpoch`
+						SELECT COUNT(*) AS `count`, MAX(`DateTime`) AS `last_epoch`
 						FROM ${entry.prefix}_log
 						WHERE `SensorID`=${entry.id}
 					""".trimIndent()
@@ -66,7 +66,7 @@ object Zeus
 
 			// Roll each device's sensor stats up: last_epoch = latest of any of its sensors, count = sum of all of them
 			val deviceStatsSQL = """
-				SELECT `Prefix`, `device_id`, SUM(`Count`) AS `Count`, MAX(`last_epoch`) AS `LastEpoch`
+				SELECT `Prefix`, `device_id`, SUM(`Count`) AS `count`, MAX(`last_epoch`) AS `last_epoch`
 				FROM sensor
 				GROUP BY `Prefix`, `device_id`
 			""".trimIndent()
@@ -137,7 +137,7 @@ object Zeus
 			// display metadata, not per-instance data) and no `user` table (no per-station
 			// ownership) -- station stats come straight from `log`, one rollup instead of two.
 			val statsSQL = """
-				SELECT `station`, COUNT(*) AS `Count`, MAX(`epoch`) AS `LastEpoch`
+				SELECT `station`, COUNT(*) AS `count`, MAX(`epoch`) AS `last_epoch`
 				FROM log
 				GROUP BY `station`
 			""".trimIndent()
