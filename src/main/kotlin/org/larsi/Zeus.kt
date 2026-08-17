@@ -162,12 +162,8 @@ object Zeus
 				try {
 					println(entry.prefix)
 					val prefix = entry.prefix.lowercase()
-					val updateSQL = """
-						UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
-						WHERE `Prefix`='$prefix'
-					""".trimIndent()
-					md.executeUpdate(updateSQL)
 
+					var successfulSet = ""
 					val zeusInfo = zeusConfig[prefix]
 					if (zeusInfo != null) {
 						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
@@ -175,12 +171,15 @@ object Zeus
 						val successful = delta <= zeusInfo.minutes
 						if (zeusInfo.successful != successful) {
 							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: $prefix ($delta min)\n")
-							val successfulSQL = """
-								UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `Prefix`='$prefix';
-							""".trimIndent()
-							md.executeUpdate(successfulSQL)
+							successfulSet = ", `zeus_successful`=${if (successful) "1" else "0"}"
 						}
 					}
+
+					val updateSQL = """
+						UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}$successfulSet
+						WHERE `Prefix`='$prefix'
+					""".trimIndent()
+					md.executeUpdate(updateSQL)
 				}
 				catch (e: Exception) {
 					e.printStackTrace()
