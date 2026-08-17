@@ -10,15 +10,17 @@ object Zeus
 	const val NTFY_TOPIC = "larsi-zeus"
 
 	@JvmStatic
-	fun check(): MutableList<String>
+	fun check(): ZeusCheckResult
 	{
 		val alerts = mutableListOf<String>()
+		val dbErrors = mutableListOf<String>()
 
 		try {
 			checkSensors(alerts)
 		}
 		catch (e: Exception) {
 			e.printStackTrace()
+			dbErrors.add("larsi-sensors: ${e.message}\n")
 		}
 
 		try {
@@ -26,9 +28,10 @@ object Zeus
 		}
 		catch (e: Exception) {
 			e.printStackTrace()
+			dbErrors.add("larsi-weather2: ${e.message}\n")
 		}
 
-		return alerts
+		return ZeusCheckResult(alerts, dbErrors)
 	}
 
 	/** larsi-sensors: per-sensor stats -> rolled up per-device -> per-device alerting */
@@ -146,49 +149,42 @@ object Zeus
 				ZeusDeviceStats(prefix = it.getString(1), count = it.getInt(2), lastEpoch = it.getInt(3))
 			}
 
+			// zeus_minutes/zeus_successful, keyed by lowercase Prefix -- only stations with
+			// zeus_minutes > 0 are monitored at all; joined against `stats` below rather than
+			// checked in its own loop, since a station absent from `log` has nothing to update
+			// or check this run anyway.
+			val zeusConfigSQL = """
+				SELECT `Prefix`, `zeus_minutes`, `zeus_successful`
+				FROM location
+				WHERE `zeus_minutes` > 0
+			""".trimIndent()
+			val zeusConfig = md.queryList(zeusConfigSQL) {
+				ZeusEntry(prefix = it.getString(1), minutes = it.getInt(2), successful = it.getInt(3) != 0)
+			}.associateBy { it.prefix }
+
 			println("Aggregating stats for ${stats.size} weather2 stations...")
 			for (entry in stats) {
 				try {
 					println(entry.prefix)
+					val prefix = entry.prefix.lowercase()
 					val updateSQL = """
 						UPDATE location SET `count`=${entry.count}, `last_epoch`=${entry.lastEpoch}
-						WHERE `Prefix`='${entry.prefix.lowercase()}'
+						WHERE `Prefix`='$prefix'
 					""".trimIndent()
 					md.executeUpdate(updateSQL)
-				}
-				catch (e: Exception) {
-					e.printStackTrace()
-				}
-			}
 
-			// Check if values are outdated, per station
-			val zeusEntriesSQL = """
-				SELECT `Prefix`, `last_epoch`, `zeus_minutes`, `zeus_successful`
-				FROM location
-				WHERE `zeus_minutes` > 0
-			""".trimIndent()
-			val zeusEntries = md.queryList(zeusEntriesSQL) {
-				ZeusEntry(
-					prefix = it.getString(1),
-					lastEpoch = it.getInt(2),
-					minutes = it.getInt(3),
-					successful = it.getInt(4) != 0
-				)
-			}
-
-			println("Checking ${zeusEntries.size} weather2 zeus entries...")
-			for (entry in zeusEntries) {
-				try {
-					println(entry.prefix)
-					var delta = (Date().time / 1000).toInt() - entry.lastEpoch
-					delta /= 60 // in minutes
-					val successful = delta <= entry.minutes
-					if (entry.successful != successful) {
-						alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: ${entry.prefix} ($delta min)\n")
-						val successfulSQL = """
-							UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `Prefix`='${entry.prefix}';
-						""".trimIndent()
-						md.executeUpdate(successfulSQL)
+					val zeusInfo = zeusConfig[prefix]
+					if (zeusInfo != null) {
+						var delta = (Date().time / 1000).toInt() - entry.lastEpoch
+						delta /= 60 // in minutes
+						val successful = delta <= zeusInfo.minutes
+						if (zeusInfo.successful != successful) {
+							alerts.add("${if (successful) "✅ RESUMED" else "⚠️ FAILED"}: $prefix ($delta min)\n")
+							val successfulSQL = """
+								UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"} WHERE `Prefix`='$prefix';
+							""".trimIndent()
+							md.executeUpdate(successfulSQL)
+						}
 					}
 				}
 				catch (e: Exception) {
@@ -203,15 +199,28 @@ object Zeus
 	@JvmStatic
 	fun main(args: Array<String>)
 	{
-		val alerts = check()
-		if (alerts.isNotEmpty()) {
-			val message = alerts.joinToString("")
+		val result = check()
+		if (result.alerts.isNotEmpty()) {
+			val message = result.alerts.joinToString("")
 			println(message)
 			Ntfy.publish(NTFY_TOPIC, "Zeus Update", message)
+		}
+		if (result.dbErrors.isNotEmpty()) {
+			val message = result.dbErrors.joinToString("")
+			println(message)
+			Ntfy.publish(NTFY_TOPIC, "🚨 Zeus DB Error", message, priority = "urgent", tags = "rotating_light")
 		}
 
 		println("Done")
 	}
+
+	/** Result of a `check()` run: normal FAILED/RESUMED alerts, plus any DB-unreachable errors
+	 *  (e.g. GoDaddy IP whitelist lapsed) that aborted a whole `checkSensors`/`checkWeather` pass --
+	 *  kept separate so the latter can be pushed as its own urgent/red ntfy notification. */
+	data class ZeusCheckResult(
+		val alerts: List<String>,
+		val dbErrors: List<String>
+	)
 
 	/** Keeps one zeus entry. A weather2 station is just a location with a single implicit
 	 *  device, so it reuses this with `id`/`deviceName` left at their defaults. */
