@@ -100,7 +100,7 @@ object Ish2
 							if (sGF1_Skc != "**")
 								rows += logRow(prefix, utc, 6, sGF1_Skc)
 						} // while read
-						md.addBatch("INSERT INTO log (epoch,station,channel,value) VALUES ${rows.joinToString(",")}")
+						md.addBatch("INSERT INTO log (epoch,prefix,channel,value) VALUES ${rows.joinToString(",")}")
 
 						println("${1 + idx}/${Icao.entries.size}: ${rows.size} records - UTC:  $utcStart - $utcEnd - Go!")
 						md.executeBatch()

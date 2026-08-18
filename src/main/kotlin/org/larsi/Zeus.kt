@@ -134,9 +134,9 @@ object Zeus
 			// queries `log` directly just to compute the alerting delta below. location.last_epoch
 			// itself is ingest-owned by GeoNames2 now, not Zeus, so it's never written back here.
 			val statsSQL = """
-				SELECT `station`, MAX(`epoch`) AS `last_epoch`
+				SELECT `prefix`, MAX(`epoch`) AS `last_epoch`
 				FROM log
-				GROUP BY `station`
+				GROUP BY `prefix`
 			""".trimIndent()
 			val stats = md.queryList(statsSQL) {
 				ZeusDeviceStats(prefix = it.getString(1), lastEpoch = it.getInt(2))
