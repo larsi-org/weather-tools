@@ -47,7 +47,7 @@ object Ish2
 			println(">>> STARTING UPLOAD YEAR: $year <<<")
 
 			for ((idx, entry) in Icao.entries.withIndex()) {
-				val prefix = entry.name.uppercase()
+				val prefix = entry.name.lowercase()
 				val inName = File(WeatherToolsConfig.WORK_DIRECTORY, "$year/${entry.usafWban}-$year.gz").path
 
 				if (!File(inName).exists())
@@ -100,7 +100,7 @@ object Ish2
 							if (sGF1_Skc != "**")
 								rows += logRow(prefix, utc, 6, sGF1_Skc)
 						} // while read
-						md.addBatch("INSERT INTO log (epoch,station,sensor_id,value) VALUES ${rows.joinToString(",")}")
+						md.addBatch("INSERT INTO log (epoch,station,channel,value) VALUES ${rows.joinToString(",")}")
 
 						println("${1 + idx}/${Icao.entries.size}: ${rows.size} records - UTC:  $utcStart - $utcEnd - Go!")
 						md.executeBatch()

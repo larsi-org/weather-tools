@@ -142,10 +142,11 @@ object Zeus
 				ZeusDeviceStats(prefix = it.getString(1), lastEpoch = it.getInt(2))
 			}
 
-			// zeus_minutes/zeus_successful, keyed by lowercase prefix -- only stations with
-			// zeus_minutes > 0 are monitored at all; joined against `stats` below rather than
-			// checked in its own loop, since a station absent from `log` has nothing to update
-			// or check this run anyway.
+			// zeus_minutes/zeus_successful, keyed by prefix (log.station and location.prefix are
+			// both lowercase, so this matches `stats` below directly, no case conversion) -- only
+			// stations with zeus_minutes > 0 are monitored at all; joined against `stats` below
+			// rather than checked in its own loop, since a station absent from `log` has nothing
+			// to update or check this run anyway.
 			val zeusConfigSQL = """
 				SELECT `prefix`, `zeus_minutes`, `zeus_successful`
 				FROM location
@@ -158,8 +159,8 @@ object Zeus
 			println("Checking ${stats.size} weather2 stations...")
 			for (entry in stats) {
 				try {
-					println(entry.prefix)
-					val prefix = entry.prefix.lowercase()
+					val prefix = entry.prefix
+					println(prefix)
 
 					val zeusInfo = zeusConfig[prefix]
 					if (zeusInfo != null) {

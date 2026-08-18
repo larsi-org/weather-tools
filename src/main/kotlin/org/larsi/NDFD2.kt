@@ -48,8 +48,8 @@ object NDFD2
 			MeteredDataConnector("larsi-weather2").use { md ->
 				/** Get ICAO entries */
 				entries.addAll(md.queryList("SELECT prefix, Y(point) AS latitude, X(point) AS longitude FROM location") {
-					NDFDEntry(it.getString(1).uppercase(), it.getString(2), it.getString(3))
-				}.filter { it.prefix.startsWith("K") })
+					NDFDEntry(it.getString(1), it.getString(2), it.getString(3))
+				}.filter { it.prefix.startsWith("k") })
 
 				// check all entries
 				println("Checking ${entries.size} Entries...")
@@ -210,7 +210,7 @@ object NDFD2
 					val v = values[j]
 					val t = times[j]
 					val lastCurrent = md.getMaxDateTimeLog2(prefix, sensorID - 16)
-					if (prefix.startsWith("K")) {
+					if (prefix.startsWith("k")) {
 						val cnt = minOf(v.size, t.size)
 						for (i in 0 until cnt) {
 							val tPredicted = t[i]

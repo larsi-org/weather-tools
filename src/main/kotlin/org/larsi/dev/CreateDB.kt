@@ -481,7 +481,7 @@ object CreateDB
 
 	@JvmStatic
 	fun table() {
-		val names = Icao.entries.map { it.name }.sorted()
+		val names = Icao.entries.map { it.name.lowercase() }.sorted()
 
 		var st = "'${names[0]}'"
 		for (i in 1 until names.size)
@@ -489,13 +489,13 @@ object CreateDB
 
 		println("DROP TABLE IF EXISTS `log`;")
 		println("CREATE TABLE IF NOT EXISTS `log` (")
-		println("  `epoch` int NOT NULL,")
+		println("  `epoch` int unsigned NOT NULL,")
 		println("  `station` ENUM ($st) NOT NULL,")
-		println("  `sensor_id` tinyint unsigned NOT NULL,")
+		println("  `channel` tinyint unsigned NOT NULL,")
 		println("  `value` float NOT NULL,")
 		println("  KEY `epoch` (`epoch`),")
 		println("  KEY `station` (`station`),")
-		println("  KEY `sensor_id` (`sensor_id`)")
+		println("  KEY `channel` (`channel`)")
 		println(") ENGINE=MyISAM DEFAULT CHARSET=utf8;")
 		println()
 	}

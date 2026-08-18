@@ -60,13 +60,13 @@ object GeoNames2
 		try {
 			MeteredDataConnector("larsi-weather2").use { md ->
 				/** Get ICAO entries */
-				val entries = md.queryList("SELECT prefix FROM location;") { it.getString(1).uppercase() }
+				val entries = md.queryList("SELECT prefix FROM location;") { it.getString(1) }
 
 				// check all entries
-				for ((i, entry) in entries.withIndex()) {
-					val prefix = entry.uppercase()
-					val header = "${String.format("%4s", i + 1)} / ${String.format("%4s", entries.size)} - $prefix:"
-					url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$prefix"
+				for ((i, prefix) in entries.withIndex()) {
+					val icao = prefix.uppercase() // GeoNames' API and log lines want the conventional uppercase ICAO code; DB writes use prefix (lowercase) directly
+					val header = "${String.format("%4s", i + 1)} / ${String.format("%4s", entries.size)} - $icao:"
+					url = "http://api.geonames.org/weatherIcao?username=larsi&ICAO=$icao"
 
 					try {
 						md.clearBatch()

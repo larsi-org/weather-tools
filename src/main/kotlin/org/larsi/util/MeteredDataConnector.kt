@@ -102,10 +102,10 @@ class MeteredDataConnector : Closeable
 		"INSERT INTO log VALUES ($dateTime, '$stationId', $sensorID, $value)"
 
 	fun emptyLogSQL2(prefix: String, sensorID: Int): String =
-		"DELETE FROM log WHERE station='$prefix' AND sensor_id=$sensorID"
+		"DELETE FROM log WHERE station='$prefix' AND channel=$sensorID"
 
 	fun cleanLogSQL2(prefix: String, sensorIDs: String, timeMin: Int, timeMax: Int): String =
-		"DELETE FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs) AND epoch >= $timeMin AND epoch <= $timeMax"
+		"DELETE FROM log WHERE station='$prefix' AND channel IN ($sensorIDs) AND epoch >= $timeMin AND epoch <= $timeMax"
 
 	fun updateLastEpochSQL2(prefix: String, epoch: Int): String =
 		"UPDATE location SET last_epoch=$epoch WHERE prefix='$prefix'"
@@ -115,11 +115,11 @@ class MeteredDataConnector : Closeable
 
 	@Throws(SQLException::class)
 	fun getMaxDateTimeLog2(prefix: String, sensorID: Int): Int =
-		queryList("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id=$sensorID") { it.getInt(1) }.first()
+		queryList("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND channel=$sensorID") { it.getInt(1) }.first()
 
 	@Throws(SQLException::class)
 	fun getMaxDateTimeLog2(prefix: String, sensorIDs: String): Int =
-		queryList("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs)") { it.getInt(1) }.first()
+		queryList("SELECT MAX(epoch) FROM log WHERE station='$prefix' AND channel IN ($sensorIDs)") { it.getInt(1) }.first()
 
 	@Throws(SQLException::class)
 	fun <T> queryList(statement: String, mapper: (ResultSet) -> T): List<T> {
