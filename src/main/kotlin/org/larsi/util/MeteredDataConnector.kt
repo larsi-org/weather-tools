@@ -108,7 +108,7 @@ class MeteredDataConnector : Closeable
 		"DELETE FROM log WHERE station='$prefix' AND sensor_id IN ($sensorIDs) AND epoch >= $timeMin AND epoch <= $timeMax"
 
 	fun updateLastEpochSQL2(prefix: String, epoch: Int): String =
-		"UPDATE location SET last_epoch=$epoch WHERE Prefix='$prefix'"
+		"UPDATE location SET last_epoch=$epoch WHERE prefix='$prefix'"
 
 	fun optimizeTable(name: String): String =
 		"OPTIMIZE TABLE $name"

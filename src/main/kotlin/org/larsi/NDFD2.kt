@@ -47,7 +47,7 @@ object NDFD2
 		try {
 			MeteredDataConnector("larsi-weather2").use { md ->
 				/** Get ICAO entries */
-				entries.addAll(md.queryList("SELECT Prefix, Y(Location) AS Latitude, X(Location) AS Longitude FROM location") {
+				entries.addAll(md.queryList("SELECT prefix, Y(point) AS latitude, X(point) AS longitude FROM location") {
 					NDFDEntry(it.getString(1).uppercase(), it.getString(2), it.getString(3))
 				}.filter { it.prefix.startsWith("K") })
 

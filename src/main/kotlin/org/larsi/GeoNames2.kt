@@ -60,7 +60,7 @@ object GeoNames2
 		try {
 			MeteredDataConnector("larsi-weather2").use { md ->
 				/** Get ICAO entries */
-				val entries = md.queryList("SELECT Prefix FROM location;") { it.getString(1).uppercase() }
+				val entries = md.queryList("SELECT prefix FROM location;") { it.getString(1).uppercase() }
 
 				// check all entries
 				for ((i, entry) in entries.withIndex()) {

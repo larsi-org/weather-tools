@@ -25,7 +25,7 @@ object GetIcons
 	{
 		try {
 			MeteredDataConnector("larsi-epw").use { md ->
-				val locations = md.queryList("SELECT Prefix, Y(Location), X(Location) FROM location WHERE 1 ORDER BY Prefix") {
+				val locations = md.queryList("SELECT prefix, Y(point), X(point) FROM location WHERE 1 ORDER BY prefix") {
 					Location(it.getString(1).lowercase(), it.getFloat(2), it.getFloat(3))
 				}
 

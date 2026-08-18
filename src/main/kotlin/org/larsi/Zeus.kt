@@ -142,12 +142,12 @@ object Zeus
 				ZeusDeviceStats(prefix = it.getString(1), lastEpoch = it.getInt(2))
 			}
 
-			// zeus_minutes/zeus_successful, keyed by lowercase Prefix -- only stations with
+			// zeus_minutes/zeus_successful, keyed by lowercase prefix -- only stations with
 			// zeus_minutes > 0 are monitored at all; joined against `stats` below rather than
 			// checked in its own loop, since a station absent from `log` has nothing to update
 			// or check this run anyway.
 			val zeusConfigSQL = """
-				SELECT `Prefix`, `zeus_minutes`, `zeus_successful`
+				SELECT `prefix`, `zeus_minutes`, `zeus_successful`
 				FROM location
 				WHERE `zeus_minutes` > 0
 			""".trimIndent()
@@ -173,7 +173,7 @@ object Zeus
 						// the write on the same condition that gates the alert.
 						val updateSQL = """
 							UPDATE location SET `zeus_successful`=${if (successful) "1" else "0"}
-							WHERE `Prefix`='$prefix'
+							WHERE `prefix`='$prefix'
 						""".trimIndent()
 						md.executeUpdate(updateSQL)
 					}
