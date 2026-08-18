@@ -44,7 +44,7 @@ object Zeus
 					val statsSQL = """
 						SELECT COUNT(*) AS `count`, MAX(`epoch`) AS `last_epoch`
 						FROM ${entry.prefix}_log
-						WHERE `id`=${entry.id}
+						WHERE `channel`=${entry.id}
 					""".trimIndent()
 					val stats = md.queryList(statsSQL) {
 						ZeusStats(it.getInt(1), it.getInt(2))
