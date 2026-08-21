@@ -16,6 +16,7 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 
 import org.larsi.util.MeteredDataConnector
+import org.larsi.util.Ntfy
 
 object GeoNames2
 {
@@ -135,6 +136,7 @@ object GeoNames2
 			}
 		} catch (e: Exception) {
 			e.printStackTrace()
+			Ntfy.publish(Zeus.NTFY_TOPIC, "GeoNames DB Error", "DB connection was refused (larsi-weather2)", priority = "urgent", tags = "rotating_light")
 		}
 
 		executor.shutdownNow()

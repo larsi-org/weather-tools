@@ -19,11 +19,18 @@ object Zeus
 
 		try {
 			checkSensors(alerts)
+		}
+		catch (e: Exception) {
+			e.printStackTrace()
+			return ZeusCheckResult(alerts, "DB connection was refused (larsi-sensors)")
+		}
+
+		try {
 			checkWeather(alerts)
 		}
 		catch (e: Exception) {
 			e.printStackTrace()
-			return ZeusCheckResult(alerts, "DB connection was refused")
+			return ZeusCheckResult(alerts, "DB connection was refused (larsi-weather2)")
 		}
 
 		return ZeusCheckResult(alerts)
