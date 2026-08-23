@@ -1,48 +1,64 @@
 -- Table creation for the larsi-weather2 schema (prospective successor to larsi-weather).
--- Generated 2026-07-13:
+-- Originally generated 2026-07-13:
 --   - `log`: single shared multi-tenant table for all stations, generated via
 --     org.larsi.dev.CreateDB.table() (uncomment `table();` in its main(), `mvn compile`,
---     run `org.larsi.dev.CreateDB`, then re-comment) — the `station` ENUM is derived from
---     util/Icao.kt's registered station list.
+--     run `org.larsi.dev.CreateDB`, then re-comment) — the station enum was originally derived
+--     from util/Icao.kt's registered station list; as of the 2026-08-24 rename below it's
+--     copied straight from the live table instead (see that section's own comment).
 --   - `location`: table definition copied verbatim (SHOW CREATE TABLE) from the live
 --     larsi-weather schema, since GeoNames2/NDFD2/Ish2 all query it the same way GeoNames/NDFD
---     do. `Location` is a spatial POINT column (lng lat), same convention used by both
---     larsi-weather.location and larsi-sensors.location — enables SQL distance calculations via
---     e.g. ST_Distance_Sphere(a.Location, b.Location) (returns meters), no manual Haversine SQL
---     needed. Row data generated via org.larsi.dev.CreateDB.location() the same way as `table()`
---     above; `Prefix` values are intentionally lowercase, matching production's convention (code
---     always uppercases whatever it reads back before matching it against the `log.station` ENUM,
---     so the stored case doesn't affect querying).
+--     do. `coordinates` is a spatial POINT column (lng lat), same convention used by every
+--     larsi.org location table — enables SQL distance calculations via e.g.
+--     ST_Distance_Sphere(a.coordinates, b.coordinates) (returns meters), no manual Haversine
+--     SQL needed. Row data generated via org.larsi.dev.CreateDB.location() the same way as
+--     `table()` above; `prefix` values are intentionally lowercase, matching production's
+--     convention (code always uppercases whatever it reads back before matching it against
+--     `log.prefix`'s enum, so the stored case doesn't affect querying).
 -- Run against the larsi-weather2 database (empty, created 2026-07-13 on the production server).
 --
 -- WARNING (as of 2026-07-14): larsi-weather2.log now holds live production data — GeoNames2 has
 -- been running against it since Jenkins was switched over from GeoNames. Since 2026-07-14, `log`
 -- and `location`'s DROP TABLE IF EXISTS statements below are destructive if this file is ever
--- re-run in full; extract only the section you actually need to (re-)run (e.g. the `sensor` table
--- added below was applied standalone, not by rerunning this whole file).
+-- re-run in full; extract only the section you actually need to (re-)run.
+--
+-- NOTE (2026-08-24): this file no longer has a `sensor` table section -- that table was dropped
+-- from the live database (weather/json/sensors.php now hardcodes sensor metadata in PHP instead,
+-- since it's static/shared across all stations, unlike larsi-sensors' per-device model). `log`'s
+-- `station`/`sensor_id` columns were renamed to `prefix`/`channel` and lowercased, and
+-- `location`'s columns were lowercased, to match the live schema -- see each section below.
 
+-- Column names updated 2026-08-24 to match the live table: `station` (uppercase ICAO
+-- enum) -> `prefix` (lowercase, matching every other larsi.org log/location table's
+-- convention), `sensor_id` -> `channel`. The enum roster and index names below are
+-- copied verbatim from the live table (SHOW CREATE TABLE) rather than regenerated via
+-- util/Icao.kt, so this reflects whatever stations were registered as of that date --
+-- diff against a fresh SHOW CREATE TABLE before relying on the roster being current.
 DROP TABLE IF EXISTS `log`;
-CREATE TABLE IF NOT EXISTS `log` (
-  `epoch` int NOT NULL,
-  `station` ENUM ('KABI','KABQ','KABR','KACK','KACY','KADM','KAFF','KAGS','KAHN','KAKO','KAKQ','KALB','KALO','KAMA','KANE','KANJ','KAPA','KAPN','KASD','KASE','KAST','KATL','KAUG','KAUS','KAVL','KAWM','KAXN','KBDR','KBED','KBFI','KBGM','KBGR','KBHM','KBIS','KBJC','KBKF','KBLV','KBNA','KBOI','KBOS','KBRD','KBRO','KBTR','KBTV','KBUF','KBWG','KBWI','KBZN','KCAE','KCAG','KCAR','KCDC','KCDS','KCHA','KCHS','KCID','KCKB','KCLE','KCLL','KCLT','KCMH','KCOD','KCOE','KCOS','KCOU','KCRG','KCRP','KCTB','KCVG','KCVS','KCYS','KDAB','KDAL','KDAY','KDBQ','KDCA','KDDC','KDEC','KDEN','KDET','KDFW','KDLH','KDLS','KDPG','KDRA','KDRO','KDRT','KDSM','KDTW','KDVN','KDVT','KEAU','KEDW','KEET','KEKN','KEKO','KELM','KELP','KELY','KEND','KENV','KERI','KEUG','KEVV','KEWR','KEYW','KFAR','KFAT','KFAY','KFDR','KFFC','KFLG','KFNT','KFSD','KFSM','KFTW','KFTY','KFWA','KFYV','KGCK','KGCN','KGEG','KGFK','KGGG','KGGW','KGJT','KGLD','KGLR','KGMU','KGNV','KGRB','KGRK','KGRR','KGSO','KGSP','KGTF','KGWO','KGXY','KGYY','KHFD','KHIB','KHLN','KHMN','KHOU','KHQM','KHSE','KHSV','KHTS','KHUL','KHVR','KHYS','KIAD','KIAG','KIAH','KICT','KILG','KILM','KILN','KIND','KINL','KINT','KINW','KISP','KITH','KIWA','KJAN','KJAX','KJFK','KJKL','KLAA','KLAF','KLAM','KLAN','KLAS','KLAX','KLBB','KLBF','KLBL','KLCH','KLEX','KLGA','KLIC','KLIT','KLNK','KLOT','KLOU','KLRD','KLRF','KLUK','KLVS','KMAF','KMCI','KMCN','KMCO','KMDW','KMEM','KMFR','KMGM','KMGW','KMHK','KMIA','KMKC','KMKE','KMKG','KMLB','KMLS','KMOB','KMPV','KMRB','KMRY','KMSN','KMSO','KMSP','KMSY','KMWL','KNEW','KNID','KNKT','KNKX','KNQA','KOAK','KOFF','KOGD','KOKC','KOMA','KONT','KOPF','KORD','KORF','KOUN','KPAH','KPBI','KPDT','KPDX','KPGA','KPHL','KPHX','KPIA','KPIH','KPIR','KPIT','KPKD','KPNA','KPNE','KPOE','KPOU','KPRC','KPSP','KPTK','KPUB','KPVD','KPWM','KRAP','KRDD','KRDU','KRFD','KRIC','KRIW','KRNO','KROA','KROC','KROW','KSAC','KSAF','KSAN','KSAT','KSAV','KSBN','KSBY','KSEA','KSFO','KSGF','KSHR','KSHV','KSJT','KSLC','KSLE','KSMP','KSPS','KSTC','KSTJ','KSTL','KSTP','KSUS','KSUX','KSYR','KTLH','KTOP','KTPA','KTPH','KTRI','KTUL','KTUP','KTUS','KTYR','KTYS','KUIL','KUNV','KVBG','KVRB','KVTN','KWAL','KWMC','KYKM') NOT NULL,
-  `sensor_id` tinyint unsigned NOT NULL,
+CREATE TABLE `log` (
+  `epoch` int(10) unsigned NOT NULL,
+  `prefix` enum('kabi','kabq','kabr','kack','kacy','kadm','kaff','kags','kahn','kako','kakq','kalb','kalo','kama','kane','kanj','kapa','kapn','kasd','kase','kast','katl','kaug','kaus','kavl','kawm','kaxn','kbdr','kbed','kbfi','kbgm','kbgr','kbhm','kbis','kbjc','kbkf','kblv','kbna','kboi','kbos','kbrd','kbro','kbtr','kbtv','kbuf','kbwg','kbwi','kbzn','kcae','kcag','kcar','kcdc','kcds','kcha','kchs','kcid','kckb','kcle','kcll','kclt','kcmh','kcod','kcoe','kcos','kcou','kcrg','kcrp','kctb','kcvg','kcvs','kcys','kdab','kdal','kday','kdbq','kdca','kddc','kdec','kden','kdet','kdfw','kdlh','kdls','kdpg','kdra','kdro','kdrt','kdsm','kdtw','kdvn','kdvt','keau','kedw','keet','kekn','keko','kelm','kelp','kely','kend','kenv','keri','keug','kevv','kewr','keyw','kfar','kfat','kfay','kfdr','kffc','kflg','kfnt','kfsd','kfsm','kftw','kfty','kfwa','kfyv','kgck','kgcn','kgeg','kgfk','kggg','kggw','kgjt','kgld','kglr','kgmu','kgnv','kgrb','kgrk','kgrr','kgso','kgsp','kgtf','kgwo','kgxy','kgyy','khfd','khib','khln','khmn','khou','khqm','khse','khsv','khts','khul','khvr','khys','kiad','kiag','kiah','kict','kilg','kilm','kiln','kind','kinl','kint','kinw','kisp','kith','kiwa','kjan','kjax','kjfk','kjkl','klaa','klaf','klam','klan','klas','klax','klbb','klbf','klbl','klch','klex','klga','klic','klit','klnk','klot','klou','klrd','klrf','kluk','klvs','kmaf','kmci','kmcn','kmco','kmdw','kmem','kmfr','kmgm','kmgw','kmhk','kmia','kmkc','kmke','kmkg','kmlb','kmls','kmob','kmpv','kmrb','kmry','kmsn','kmso','kmsp','kmsy','kmwl','knew','knid','knkt','knkx','knqa','koak','koff','kogd','kokc','koma','kont','kopf','kord','korf','koun','kpah','kpbi','kpdt','kpdx','kpga','kphl','kphx','kpia','kpih','kpir','kpit','kpkd','kpna','kpne','kpoe','kpou','kprc','kpsp','kptk','kpub','kpvd','kpwm','krap','krdd','krdu','krfd','kric','kriw','krno','kroa','kroc','krow','ksac','ksaf','ksan','ksat','ksav','ksbn','ksby','ksea','ksfo','ksgf','kshr','kshv','ksjt','kslc','ksle','ksmp','ksps','kstc','kstj','kstl','kstp','ksus','ksux','ksyr','ktlh','ktop','ktpa','ktph','ktri','ktul','ktup','ktus','ktyr','ktys','kuil','kunv','kvbg','kvrb','kvtn','kwal','kwmc','kykm') NOT NULL,
+  `channel` tinyint(3) unsigned NOT NULL,
   `value` float NOT NULL,
-  KEY `epoch` (`epoch`),
-  KEY `station` (`station`),
-  KEY `sensor_id` (`sensor_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  KEY `idx_station_sensor_epoch` (`prefix`,`channel`,`epoch`,`value`),
+  KEY `idx_station_epoch` (`prefix`,`epoch`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- Column names updated 2026-08-24 to match the live table (renamed to lowercase snake_case
+-- along with larsi-sensors/larsi-epw's location tables, see the html repo's CLAUDE.md). The
+-- live table also has last_epoch/count/zeus_minutes/zeus_successful (added later, for Zeus
+-- alerting) that aren't represented in this snapshot's schema or the INSERT rows below --
+-- add those separately if rebuilding a fully current copy from this file.
 DROP TABLE IF EXISTS `location`;
 CREATE TABLE `location` (
-  `Prefix` varchar(16) NOT NULL,
-  `Description` varchar(64) NOT NULL,
-  `Location` point NOT NULL,
-  `Elevation` float NOT NULL,
-  `TimeZone` float NOT NULL DEFAULT 0,
-  `Priority` tinyint(4) NOT NULL DEFAULT 0,
-  `Comment` varchar(255) NOT NULL,
-  PRIMARY KEY (`Prefix`),
-  SPATIAL KEY `Location` (`Location`)
+  `prefix` varchar(16) NOT NULL,
+  `description` varchar(64) NOT NULL,
+  `coordinates` point NOT NULL,
+  `elevation` float NOT NULL,
+  `time_zone` float NOT NULL DEFAULT 0,
+  `priority` tinyint(4) NOT NULL DEFAULT 0,
+  `comment` varchar(255) NOT NULL,
+  PRIMARY KEY (`prefix`),
+  SPATIAL KEY `Location` (`coordinates`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 INSERT INTO `location` VALUES('kabq', 'Albuquerque, NM, US', GeomFromText('POINT(-106.616 +35.042)'), +1618.5, 0, 80, 'Albuquerque, Albuquerque International Airport, NM, US');
@@ -350,46 +366,3 @@ INSERT INTO `location` VALUES('kelm', 'Elmira, NY, US', GeomFromText('POINT(-076
 INSERT INTO `location` VALUES('kith', 'Ithaca, NY, US', GeomFromText('POINT(-076.467 +42.483)'), +0335.0, 0, 50, 'Ithaca, Ithaca Tompkins Regional Airport, NY, US');
 INSERT INTO `location` VALUES('kroc', 'Rochester, NY, US', GeomFromText('POINT(-077.677 +43.117)'), +0164.3, 0, 50, 'Rochester, Greater Rochester International Airport, NY, US');
 
--- `sensor`: per-sensor-ID display metadata (Description/Property/Unit), read by
--- ~/Public/html/weather/json/sensors.php's JOIN to render report.php's "Sensors" table.
--- Schema and row content copied from the live larsi-weather.sensor table (SHOW CREATE TABLE /
--- SELECT *), with `ID` remapped from the old measured/measured+1 scheme to the new
--- measured(0-6)/measured+16 scheme. Count/DateTimeMin/DateTimeMax/ValueMin/ValueMax are all 0 in
--- the source table too — sensors.php computes those live via its own JOIN aggregate, it never
--- reads the stored columns, so they're carried over as inert placeholders for schema parity only.
--- Excludes the source table's "Weather Condition" rows (old IDs 13/14): GeoNames2 has no sensor
--- slot for that field at all (removed entirely, not just unpopulated — see GeoNames2.kt/README.md
--- sensor ID table), so there is no corresponding channel to describe in larsi-weather2.
-DROP TABLE IF EXISTS `sensor`;
-CREATE TABLE `sensor` (
-  `Prefix` varchar(16) NOT NULL,
-  `ID` smallint(6) NOT NULL,
-  `Description` varchar(64) NOT NULL,
-  `Sensor` varchar(32) NOT NULL,
-  `Property` varchar(32) NOT NULL,
-  `Unit` varchar(16) NOT NULL,
-  `Count` int(11) NOT NULL DEFAULT 0,
-  `DateTimeMin` int(11) NOT NULL DEFAULT 0,
-  `DateTimeMax` int(11) NOT NULL DEFAULT 0,
-  `ValueMin` float NOT NULL DEFAULT 0,
-  `ValueMax` float NOT NULL DEFAULT 0,
-  `ZeusMinutes` int(11) NOT NULL DEFAULT 0,
-  `ZeusSuccessful` tinyint(1) NOT NULL DEFAULT 0,
-  `Comment` varchar(255) NOT NULL,
-  PRIMARY KEY (`ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
-
-INSERT INTO `sensor` VALUES('ICAO', 0, 'Temperature (measured)', 'ICAO', 'Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 16, 'Temperature (predicted)', 'ICAO', 'Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 1, 'Dew Point Temperature (measured)', 'ICAO', 'Dew Point Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 17, 'Dew Point Temperature (predicted)', 'ICAO', 'Dew Point Temperature', 'C', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 2, 'Relative Humidity (measured)', 'ICAO', 'Relative Humidity', '%', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 18, 'Relative Humidity (predicted)', 'ICAO', 'Relative Humidity', '%', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 3, 'Pressure (measured)', 'ICAO', 'Pressure', 'hPa', 0, 0, 0, 0, 0, 0, 0, 'At sea level');
-INSERT INTO `sensor` VALUES('ICAO', 19, 'Pressure (predicted)', 'ICAO', 'Pressure', 'hPa', 0, 0, 0, 0, 0, 0, 0, 'At sea level');
-INSERT INTO `sensor` VALUES('ICAO', 4, 'Wind Direction (measured)', 'ICAO', 'Wind Direction', 'deg', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 20, 'Wind Direction (predicted)', 'ICAO', 'Wind Direction', 'deg', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 5, 'Wind Speed (measured)', 'ICAO', 'Wind Speed', 'm/s', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 21, 'Wind Speed (predicted)', 'ICAO', 'Wind Speed', 'm/s', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 6, 'Clouds (measured)', 'ICAO', 'Clouds', '10th', 0, 0, 0, 0, 0, 0, 0, '');
-INSERT INTO `sensor` VALUES('ICAO', 22, 'Clouds (predicted)', 'ICAO', 'Clouds', '10th', 0, 0, 0, 0, 0, 0, 0, '');
