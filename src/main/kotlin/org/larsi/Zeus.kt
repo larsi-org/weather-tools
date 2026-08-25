@@ -69,18 +69,16 @@ object Zeus
 				}
 			}
 
-			// Roll each device's sensor stats up: last_epoch = latest of any of its sensors,
-			// count = sum across all of its sensors. device.last_epoch itself is ingest-owned by
-			// sensors/log.php now, not Zeus -- last_epoch here only feeds the alerting delta
-			// below, never written back. count has no other writer at all, so it is written back,
-			// for every device with sensor rows regardless of Zeus monitoring status.
+			// Roll each device's sensor stats up: last_epoch = latest of any of its sensors.
+			// device.last_epoch itself is ingest-owned by sensors/log.php now, not Zeus -- this
+			// rollup only exists to compute the alerting delta below, never written back.
 			val deviceStatsSQL = """
-				SELECT `prefix`, `device_id`, MAX(`last_epoch`) AS `last_epoch`, SUM(`count`) AS `count`
+				SELECT `prefix`, `device_id`, MAX(`last_epoch`) AS `last_epoch`
 				FROM sensor
 				GROUP BY `prefix`, `device_id`
 			""".trimIndent()
 			val deviceStats = md.queryList(deviceStatsSQL) {
-				ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3), it.getInt(4))
+				ZeusDeviceStats(it.getString(1), it.getInt(2), it.getInt(3))
 			}
 
 			// device_name/zeus_minutes/zeus_successful, keyed by (prefix, device_id) -- only
@@ -106,12 +104,6 @@ object Zeus
 			for (entry in deviceStats) {
 				try {
 					println("${entry.prefix}[${entry.deviceId}]")
-
-					val countUpdateSQL = """
-						UPDATE device SET `count`=${entry.count}
-						WHERE `prefix`='${entry.prefix}' && `device_id`=${entry.deviceId}
-					""".trimIndent()
-					md.executeUpdate(countUpdateSQL)
 
 					val zeusInfo = zeusConfig[Pair(entry.prefix, entry.deviceId)]
 					if (zeusInfo != null) {
@@ -245,15 +237,13 @@ object Zeus
 		val lastEpoch: Int
 	)
 
-	/** Last-logged epoch and total row count rolled up to one device (max/sum across its
-	 *  sensors). A weather2 station is just a location with a single implicit device, so it
-	 *  reuses this with `deviceId`/`count` left at their defaults -- checkWeather doesn't roll up
-	 *  or write back a count. */
+	/** Last-logged epoch rolled up to one device (max across its sensors). A weather2 station is
+	 *  just a location with a single implicit device, so it reuses this with `deviceId` left at
+	 *  its default. */
 	data class ZeusDeviceStats(
 		val prefix: String,
 		val deviceId: Int = 0,
-		val lastEpoch: Int,
-		val count: Int = 0
+		val lastEpoch: Int
 	)
 
 }
