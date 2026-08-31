@@ -14,8 +14,12 @@ each:
   station, and stores them in MySQL (`larsi-weather2`). This is the live, currently-deployed data
   source.
 - **`NDFD2.kt`** — supplements measured observations with
-  [NOAA NDFD](https://graphical.weather.gov/) forecast data via SOAP. Written but not currently
-  deployed.
+  [NOAA NDFD](https://graphical.weather.gov/) forecast data via SOAP. Written but currently
+  unsupported: the site's display layer (`larsi-org/html`'s `weather/json/sensors.php`,
+  `weather/json/graphs.php`, `weather/report.php`) dropped its predicted-sensor-ID entries as of
+  2026-08-30, since nothing had ever logged to them. Running NDFD2 today would insert predicted
+  rows with nowhere to display them; re-enabling it needs those channel entries added back to
+  the display layer first (see this repo's `CLAUDE.md` for the exact list).
 - **`Ish2.kt`** (plus `IshHarvester.kt`) — a manual backfill tool that downloads NOAA's
   historical "ISH" (Integrated Surface Hourly) archive and re-imports it, to patch gaps left by
   harvester downtime.
@@ -31,17 +35,18 @@ each:
 
 Each stored quantity is identified by a numeric sensor ID:
 
-| Quantity | Measured (GeoNames2/Ish2) | Predicted (NDFD2) |
-|---|---|---|
-| Temperature | 0 | 16 |
-| Dew Point | 1 | 17 |
-| Humidity | 2 | 18 |
-| Sea Level Pressure | 3 | — |
-| Wind Direction | 4 | 20 |
-| Wind Speed | 5 | 21 |
-| Clouds | 6 | 22 |
+| Quantity | Measured (GeoNames2/Ish2) |
+|---|---|
+| Temperature | 0 |
+| Dew Point | 1 |
+| Humidity | 2 |
+| Sea Level Pressure | 3 |
+| Wind Direction | 4 |
+| Wind Speed | 5 |
+| Clouds | 6 |
 
-Pressure has no predicted counterpart (NDFD doesn't forecast it). Predicted IDs are `measured + 16`.
+NDFD2 would write predicted IDs at `measured + 16` (no pressure counterpart, since NDFD doesn't
+forecast it) -- see the NDFD2 note above; currently unsupported, so these IDs aren't in live use.
 
 ## Requirements
 
