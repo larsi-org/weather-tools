@@ -48,18 +48,42 @@ object Zeus
 			for (entry in zeusEntries) {
 				try {
 					println("${entry.prefix}[${entry.id}]")
-					val statsSQL = """
-						SELECT COUNT(*) AS `count`, MAX(`epoch`) AS `last_epoch`
+					// Split into two queries rather than one combined SELECT -- COUNT(*) always
+					// forces a full scan (no index can shortcut a literal count), but the
+					// latest-row lookup below can use idx_sensor_datetime (channel, epoch,
+					// value) to jump straight to the answer via ORDER BY epoch DESC LIMIT 1,
+					// without a table scan at all. Combining them would drag the fast query
+					// down to the slow one's cost -- confirmed elsewhere in this codebase (see
+					// CLAUDE.md's MySQL _log table aggregates note): ~3.4s combined vs ~0.13s
+					// split, on a comparably sized table.
+					val countSQL = """
+						SELECT COUNT(*) AS `count`
 						FROM ${entry.prefix}_log
 						WHERE `channel`=${entry.id}
 					""".trimIndent()
-					val stats = md.queryList(statsSQL) {
-						ZeusStats(it.getInt(1), it.getInt(2))
-					}.first()
-					val count = stats.count
-					val lastEpoch = stats.lastEpoch
-					val updateSQL = """
-						UPDATE sensor SET `count`=$count, `last_epoch`=$lastEpoch
+					val count = md.queryList(countSQL) { it.getInt(1) }.first()
+
+					// sensors/log.php (larsi-org/html) already updates last_epoch/last_value
+					// live on every log() call now -- this remains a reconciliation pass, not
+					// the only path: it catches a channel provisioned after log rows for it
+					// already exist (log.php's UPDATE only touches rows that already exist),
+					// or any row inserted out-of-band that skipped log.php's own update.
+					val latestSQL = """
+						SELECT `epoch`, `value`
+						FROM ${entry.prefix}_log
+						WHERE `channel`=${entry.id}
+						ORDER BY `epoch` DESC
+						LIMIT 1
+					""".trimIndent()
+					val latest = md.queryList(latestSQL) {
+						ZeusLatest(it.getInt(1), it.getDouble(2))
+					}.firstOrNull()
+
+					val updateSQL = if (latest != null) """
+						UPDATE sensor SET `count`=$count, `last_epoch`=${latest.epoch}, `last_value`=${latest.value}
+						WHERE `prefix`='${entry.prefix}' && `channel`=${entry.id}
+					""".trimIndent() else """
+						UPDATE sensor SET `count`=$count
 						WHERE `prefix`='${entry.prefix}' && `channel`=${entry.id}
 					""".trimIndent()
 					md.executeUpdate(updateSQL)
@@ -231,10 +255,10 @@ object Zeus
 		val successful: Boolean = false
 	)
 
-	/** Aggregate stats for one sensor's log rows */
-	data class ZeusStats(
-		val count: Int,
-		val lastEpoch: Int
+	/** One sensor's single most-recently-logged row */
+	data class ZeusLatest(
+		val epoch: Int,
+		val value: Double
 	)
 
 	/** Last-logged epoch rolled up to one device (max across its sensors). A weather2 station is
