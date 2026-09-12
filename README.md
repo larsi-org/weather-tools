@@ -12,7 +12,8 @@ each:
 - **`GeoNames2.kt`** — polls the [GeoNames](https://www.geonames.org/) weather API for
   METAR-derived observations (temperature, dew point, humidity, clouds, pressure, wind) per weather
   station, and stores them in MySQL (`larsi-weather2`). This is the live, currently-deployed data
-  source.
+  source. If it can't reach the database at all, it pushes its own alert (see `Zeus.kt` below)
+  rather than failing silently.
 - **`NDFD2.kt`** — supplements measured observations with
   [NOAA NDFD](https://graphical.weather.gov/) forecast data via SOAP. Written but currently
   unsupported: the site's display layer (`larsi-org/html`'s `weather/json/sensors.php`,
@@ -28,8 +29,8 @@ each:
   alerting if it can't connect to either database at all.
 - **`dev/`** — assorted one-off developer utilities (station-list generation, data export/import,
   etc.).
-- **`util/`** — shared helpers: config loading, a JDBC connection/query helper, and psychrometric
-  calculations.
+- **`util/`** — shared helpers: config loading, a JDBC connection/query helper, psychrometric
+  calculations, and push-notification alerting.
 
 ## Sensor IDs
 
