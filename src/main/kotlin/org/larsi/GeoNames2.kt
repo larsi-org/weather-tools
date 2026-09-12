@@ -53,12 +53,26 @@ object GeoNames2
 		else -> value
 	}
 
+	/** GeoNames webservice exception codes (https://www.geonames.org/export/webservice-exception.html)
+	 *  for its two credit-rate-limit cases -- the only ones [GeoNamesResult.NoObservation] callers
+	 *  need to single out from an ordinary "no data for this ICAO" status. */
+	private const val DAILY_LIMIT_EXCEEDED = 18
+	private const val HOURLY_LIMIT_EXCEEDED = 19
+
 	/** The outcome of parsing one station's GeoNames response. */
 	sealed class GeoNamesResult
 	{
-		/** GeoNames has no `weatherObservation` at all for this ICAO (e.g. an unrecognized code,
-		 *  or the JSON `status` error shape). */
-		object NoObservation : GeoNamesResult()
+		/** GeoNames has no `weatherObservation` at all for this ICAO. `statusCode`/`statusMessage`
+		 *  come from the JSON `status` object GeoNames sends in its place, when present -- e.g.
+		 *  code 15 ("no observation found") for an ICAO it just has no data for, but also code 18
+		 *  ("daily limit ... exceeded") or 19 ("hourly limit ... exceeded") when the account's
+		 *  credit quota is exhausted. GeoNames returns those as an ordinary HTTP 200 with this
+		 *  `status` body, not as a thrown exception, so without checking `statusCode` a rate-limit
+		 *  lockout is indistinguishable from a station GeoNames simply has no data for. */
+		data class NoObservation(val statusCode: Int?, val statusMessage: String?) : GeoNamesResult()
+		{
+			val isRateLimited: Boolean get() = statusCode == DAILY_LIMIT_EXCEEDED || statusCode == HOURLY_LIMIT_EXCEEDED
+		}
 
 		/** A `weatherObservation` is present but has no `datetime` -- the station itself is down. */
 		object Down : GeoNamesResult()
@@ -71,7 +85,13 @@ object GeoNames2
 	/** Pure parsing of a `weatherIcaoJSON` response body -- no network or DB involved. */
 	@JvmStatic
 	fun parseObservation(response: JsonObject, formatter: DateFormat): GeoNamesResult {
-		val obs = response.getAsJsonObject("weatherObservation") ?: return GeoNamesResult.NoObservation
+		val obs = response.getAsJsonObject("weatherObservation") ?: run {
+			val status = response.getAsJsonObject("status")
+			return GeoNamesResult.NoObservation(
+				statusCode = status?.get("value")?.asInt,
+				statusMessage = status?.get("message")?.asString
+			)
+		}
 		val datetime = obs.get("datetime")?.asString ?: return GeoNamesResult.Down
 
 		val epoch = (formatter.parse(datetime).time / 1000).toInt()
@@ -101,6 +121,11 @@ object GeoNames2
 				/** Get ICAO entries */
 				val entries = md.queryList("SELECT prefix FROM location;") { it.getString(1) }
 
+				// Tracks GeoNames rate-limit hits across the whole run, so a single ntfy alert
+				// can go out once per run below instead of once per rate-limited station.
+				var rateLimitedCount = 0
+				var rateLimitedStatus: String? = null
+
 				// check all entries
 				for ((i, prefix) in entries.withIndex()) {
 					val icao = prefix.uppercase() // GeoNames' API and log lines want the conventional uppercase ICAO code; DB writes use prefix (lowercase) directly
@@ -113,7 +138,16 @@ object GeoNames2
 						var epoch = 0
 
 						when (val result = parseObservation(fetch(icao), formatter)) {
-							is GeoNamesResult.NoObservation -> println("$header no observation available")
+							is GeoNamesResult.NoObservation -> {
+								val detail = result.statusMessage?.let { " (GeoNames status ${result.statusCode}: $it)" } ?: ""
+								if (result.isRateLimited) {
+									println("$header RATE LIMITED$detail")
+									rateLimitedCount++
+									rateLimitedStatus = rateLimitedStatus ?: "${result.statusCode}: ${result.statusMessage}"
+								} else {
+									println("$header no observation available$detail")
+								}
+							}
 							is GeoNamesResult.Down -> println("$header down")
 							is GeoNamesResult.Success -> {
 								if (result.epoch <= md.getMaxDateTimeLog2(prefix, "0,1,2,3,4,5,6")) {
@@ -136,6 +170,12 @@ object GeoNames2
 					} catch (e: Exception) {
 						println("$header did not receive / could not parse data!")
 					}
+				}
+
+				if (rateLimitedCount > 0) {
+					Ntfy.publish(Zeus.NTFY_TOPIC, "GeoNames Rate Limited",
+						"$rateLimitedCount/${entries.size} stations hit GeoNames' rate limit this run (status $rateLimitedStatus)",
+						priority = "high", tags = "warning")
 				}
 			}
 		} catch (e: Exception) {

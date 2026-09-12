@@ -7,7 +7,9 @@ import java.util.TimeZone
 import com.google.gson.JsonParser
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -54,9 +56,43 @@ class GeoNames2Test
 	}
 
 	@Test
-	fun `parseObservation returns NoObservation for GeoNames' unknown-ICAO status response`() {
+	fun `parseObservation captures the status code and message for an unknown-ICAO response`() {
 		val json = """{"status":{"message":"no observation found","value":15}}"""
-		assertEquals(GeoNames2.GeoNamesResult.NoObservation, parse(json))
+
+		val result = parse(json) as GeoNames2.GeoNamesResult.NoObservation
+
+		assertEquals(15, result.statusCode)
+		assertEquals("no observation found", result.statusMessage)
+		assertFalse(result.isRateLimited)
+	}
+
+	@Test
+	fun `parseObservation flags GeoNames status 18 as a daily rate limit`() {
+		val json = """{"status":{"message":"the daily limit of 10000 credits for larsi has been exceeded. Please throttle your requests or use the commercial service.","value":18}}"""
+
+		val result = parse(json) as GeoNames2.GeoNamesResult.NoObservation
+
+		assertEquals(18, result.statusCode)
+		assertTrue(result.isRateLimited)
+	}
+
+	@Test
+	fun `parseObservation flags GeoNames status 19 as an hourly rate limit`() {
+		val json = """{"status":{"message":"the hourly limit of 1000 credits for larsi has been exceeded.","value":19}}"""
+
+		val result = parse(json) as GeoNames2.GeoNamesResult.NoObservation
+
+		assertEquals(19, result.statusCode)
+		assertTrue(result.isRateLimited)
+	}
+
+	@Test
+	fun `parseObservation tolerates a response with neither weatherObservation nor status`() {
+		val result = parse("{}") as GeoNames2.GeoNamesResult.NoObservation
+
+		assertNull(result.statusCode)
+		assertNull(result.statusMessage)
+		assertFalse(result.isRateLimited)
 	}
 
 	@Test
