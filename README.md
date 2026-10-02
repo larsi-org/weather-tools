@@ -105,3 +105,13 @@ mvn test
 Unit tests cover the pure-logic pieces of this codebase (psychrometric calculations, database
 URL building, and NOAA fixed-width record parsing). Code that talks to a real database, network,
 or file system isn't covered by automated tests.
+
+## License
+
+MIT - see [LICENSE](LICENSE). It covers the original code in this repository. These
+files are not mine to license and stay under their own terms:
+
+- `src/main/kotlin/org/larsi/util/PsychrometricsUtil.kt` - copied from the open-source
+  project SimCon
+- `doc/stations.txt` - station list compiled by Greg Thompson, NCAR/RAP
+- `doc/isd-history.txt` - NOAA Integrated Surface Database station history (US government data)
