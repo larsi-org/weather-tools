@@ -6,21 +6,26 @@
 #
 # Every table is copied whole (schema and data), except the time-series log tables - every
 # `*_log` table of larsi-sensors and the `log` table of larsi-weather2, millions of rows each -
-# which get their schema plus only the LATEST row of each series (per channel, per prefix and
-# channel for weather), so local pages show current "last reading" values and stay fast.
+# which get their schema plus the last DAYS days of each series (per channel; per prefix and
+# channel for weather), counted back from that series' own newest reading, so a station that
+# stopped logging years ago still has its final month. The default 31 days gives every report a
+# full month (lines, daily bands, zoom, the hourly/daily toggle) at about 2.6M rows (2026-11);
+# DAYS=0 keeps only the newest row of each series (about 2,200 rows, seconds to load).
 # A local table that no longer exists on prod is dropped.
 #
 # Credentials: the larsi-admin role from the site's lib/db.php (the same users exist on prod and
 # locally; locally larsi-admin has ALL on each of the six schemas, so no sudo is needed). The
 # password goes through MYSQL_PWD, never the command line. Prod is read only: dumps run with
 # --skip-lock-tables so the live writers (sensors/log, the harvester) are never blocked, and the
-# latest-row queries are capped with max_statement_time.
+# log-table queries are capped with max_statement_time.
 #
-# Environment: DB_PHP (default ~/Public/html/lib/db.php), PROD_HOST (default larsi.org).
+# Environment: DAYS (default 31), DB_PHP (default ~/Public/html/lib/db.php), PROD_HOST (default
+# larsi.org).
 set -euo pipefail
 
 export DB_PHP=${DB_PHP:-$HOME/Public/html/lib/db.php}
 PROD_HOST=${PROD_HOST:-larsi.org}
+DAYS=${DAYS:-31}
 DBS=(larsi-sensors larsi-weather2 larsi-epw larsi-drinks larsi-wine bbq-larsi)
 [ $# -gt 0 ] && DBS=("$@")
 
@@ -60,22 +65,24 @@ for db in "${DBS[@]}"; do
   for t in "${logs[@]}"; do ignore+=("--ignore-table=$db.$t"); done
   prod_dump "${ignore[@]}" "$db" | lcl "$db"
 
-  # the log tables: schema, then the latest row of each series
+  # the log tables: schema, then the last DAYS days of each series, in batches of 5000 rows
   cols=$(series_cols "$db")
   on=$(echo "$cols" | sed -E 's/([a-z]+)/l.\1 = m.\1/g; s/, / AND /g')
   for t in "${logs[@]}"; do
     prod_dump --no-data "$db" "$t" | lcl "$db"
-    prod -N -B "$db" -e "SET STATEMENT max_statement_time=120 FOR
+    lcl -e "ALTER TABLE \`$t\` DISABLE KEYS" "$db"
+    prod --quick -N -B "$db" -e "SET STATEMENT max_statement_time=600 FOR
       SELECT l.* FROM \`$t\` l
       JOIN (SELECT $cols, MAX(epoch) AS epoch FROM \`$t\` GROUP BY $cols) m
-        ON $on AND l.epoch = m.epoch" |
+        ON $on AND l.epoch >= m.epoch - $DAYS * 86400" |
     awk -v t="$t" -F'\t' '
       { row = "("; for (i = 1; i <= NF; i++) row = row (i > 1 ? "," : "") "\x27" $i "\x27";
-        rows[n++] = row ")" }
-      END { if (n) { printf "INSERT INTO `%s` VALUES\n", t;
-                     for (i = 0; i < n; i++) printf "%s%s\n", rows[i], (i < n - 1 ? "," : ";") } }' |
+        printf "%s%s", (n % 5000 ? ",\n" : "INSERT INTO `" t "` VALUES\n"), row ")"
+        if (++n % 5000 == 0) print ";" }
+      END { if (n % 5000) print ";" }' |
     lcl "$db"
-    echo "   $t: $(lcl -N -e "SELECT COUNT(*) FROM \`$t\`" "$db") latest rows"
+    lcl -e "ALTER TABLE \`$t\` ENABLE KEYS" "$db"
+    echo "   $t: $(lcl -N -e "SELECT COUNT(*) FROM \`$t\`" "$db") rows (last $DAYS days of each series)"
   done
 
   # check: every whole-copied table has prod's row count
