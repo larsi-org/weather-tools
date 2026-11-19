@@ -437,8 +437,11 @@ object CreateDB
 			if (p > 0)
 				shrt = shrt.substring(0, p)
 
+			// Named columns, so the statement survives columns added to the live table. time_zone
+			// (standard offset) and time_zone_name (IANA) are left at 0 / NULL: fill them from
+			// lat/lng separately, as done for the existing stations on 2026-11-18.
 			println(
-					"INSERT INTO `location` VALUES('$prefix', '$shrt$pst', GeomFromText('POINT($lng $lat)'), $elv, 0, $priority, '$snm$pst');")
+					"INSERT INTO `location` (`prefix`, `description`, `coordinates`, `elevation`, `priority`, `comment`) VALUES('$prefix', '$shrt$pst', GeomFromText('POINT($lng $lat)'), $elv, $priority, '$snm$pst');")
 		}
 	}
 
