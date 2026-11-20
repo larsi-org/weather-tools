@@ -156,8 +156,10 @@ object GeoNames2
 									println("$header updating...")
 									updated = true
 									epoch = result.epoch
-									for ((sensorID, value) in result.values)
-										md.addBatch(md.insertLogSQL2(prefix, epoch, sensorID, value))
+									// one statement for the whole observation, so readers never see
+									// part of it (see insertLogRowsSQL2)
+									if (result.values.isNotEmpty())
+										md.addBatch(MeteredDataConnector.insertLogRowsSQL2(prefix, epoch, result.values))
 								}
 							}
 						}
