@@ -1,0 +1,2 @@
+// Restart Jenkins after a JDK update it runs on (see /usr/local/sbin/jenkins-jdk-restart)
+DPkg::Post-Invoke { "[ -x /usr/local/sbin/jenkins-jdk-restart ] && /usr/local/sbin/jenkins-jdk-restart || true"; };

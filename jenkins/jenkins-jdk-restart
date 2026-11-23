@@ -1,0 +1,23 @@
+#!/bin/sh
+# Restarts Jenkins when the JDK it runs on was updated on disk after Jenkins started.
+# An in-place JDK update leaves the running JVM with a jspawnhelper from the new version, and every
+# job then fails with "Failed to exec spawn helper ... JDK version mismatch" until Jenkins restarts.
+# Run by apt after every dpkg run (/etc/apt/apt.conf.d/99-jenkins-jdk-restart); does nothing when
+# Jenkins is not running or its JDK is unchanged. --check only prints what it would do.
+pid=$(systemctl show -p MainPID --value jenkins 2>/dev/null)
+[ -n "$pid" ] && [ "$pid" -gt 0 ] || exit 0
+exe=$(readlink /proc/"$pid"/exe | sed 's/ (deleted)$//')
+home=$(dirname "$(dirname "$exe")")
+helper="$home/lib/jspawnhelper"
+[ -e "$helper" ] || helper="$exe"
+[ -e "$helper" ] || exit 0
+started=$(( $(date +%s) - $(ps -o etimes= -p "$pid" | tr -d ' ') ))
+changed=$(stat -L -c %Z "$helper")  # ctime (when the file was put in place), not %Y mtime, which dpkg copies from the .deb and can predate Jenkins' start
+if [ "$changed" -gt "$started" ]; then
+  if [ "$1" = "--check" ]; then echo "would restart: $helper changed after Jenkins started"; exit 0; fi
+  logger -t jenkins-jdk-restart "JDK at $home updated after Jenkins started; restarting Jenkins"
+  systemctl try-restart jenkins
+elif [ "$1" = "--check" ]; then
+  echo "ok: Jenkins (pid $pid) runs on $home, unchanged since it started"
+fi
+exit 0
