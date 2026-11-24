@@ -46,7 +46,7 @@ object GeoNames2
 			"n/a" -> "0"
 			"few clouds" -> "2"
 			"scattered clouds" -> "4"
-			"broken clouds" -> "7"
+			"broken clouds" -> "6"
 			"overcast" -> "10"
 			else -> lower
 		}

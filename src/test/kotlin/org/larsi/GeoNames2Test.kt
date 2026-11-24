@@ -40,7 +40,7 @@ class GeoNames2Test
 		assertEquals("0", GeoNames2.transformValue(6, "n/a"))
 		assertEquals("2", GeoNames2.transformValue(6, "few clouds"))
 		assertEquals("4", GeoNames2.transformValue(6, "scattered clouds"))
-		assertEquals("7", GeoNames2.transformValue(6, "broken clouds"))
+		assertEquals("6", GeoNames2.transformValue(6, "broken clouds"))
 		assertEquals("10", GeoNames2.transformValue(6, "overcast"))
 	}
 
