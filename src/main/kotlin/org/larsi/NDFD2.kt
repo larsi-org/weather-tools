@@ -15,7 +15,7 @@ import org.apache.axis.client.Service
 import org.larsi.util.MeteredDataConnector
 
 // Currently unsupported: not scheduled anywhere (no sh/ndfd.sh wrapper), and as of 2026-08-30
-// the site's display layer (larsi-org/html's weather/json/sensors.php, weather/json/graphs.php,
+// the site's display layer (larsi-org/html's api/weather/sensors.php, api/weather/graphs.php,
 // weather/report.php) dropped its predicted-sensor-ID (16-22) entries entirely, since nothing
 // had ever logged to them. Running this would insert rows with nowhere to display them.
 // Re-enabling it needs those channel entries added back to all three of those files first --
