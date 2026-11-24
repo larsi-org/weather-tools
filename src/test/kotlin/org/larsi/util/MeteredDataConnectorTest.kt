@@ -28,7 +28,7 @@ class MeteredDataConnectorTest
 	fun `insertLogRowsSQL2 writes a whole observation as one INSERT with named columns`()
 	{
 		assertEquals(
-			"INSERT INTO log (epoch, prefix, channel, value) VALUES (1795110720, 'kroc', 0, -1.7), (1795110720, 'kroc', 2, 81), (1795110720, 'kroc', 5, 4.6)",
+			"INSERT IGNORE INTO log (epoch, prefix, channel, value) VALUES (1795110720, 'kroc', 0, -1.7), (1795110720, 'kroc', 2, 81), (1795110720, 'kroc', 5, 4.6)",
 			MeteredDataConnector.insertLogRowsSQL2("kroc", 1795110720, linkedMapOf(0 to "-1.7", 2 to "81", 5 to "4.6")))
 	}
 }

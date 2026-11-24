@@ -50,8 +50,8 @@ object Zeus
 					println("${entry.prefix}[${entry.id}]")
 					// Split into two queries rather than one combined SELECT -- COUNT(*) always
 					// forces a full scan (no index can shortcut a literal count), but the
-					// latest-row lookup below can use idx_sensor_datetime (channel, epoch,
-					// value) to jump straight to the answer via ORDER BY epoch DESC LIMIT 1,
+					// latest-row lookup below can use uniq_sensor_epoch (channel, epoch) to
+					// jump straight to the answer via ORDER BY epoch DESC LIMIT 1,
 					// without a table scan at all. Combining them would drag the fast query
 					// down to the slow one's cost -- confirmed elsewhere in this codebase (see
 					// CLAUDE.md's MySQL _log table aggregates note): ~3.4s combined vs ~0.13s

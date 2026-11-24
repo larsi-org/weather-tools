@@ -30,10 +30,12 @@ class MeteredDataConnector : Closeable
 		/** All of one station's values for one observation as a single multi-row INSERT. `log` is
 		 *  MyISAM (no transactions), but a reader sees one statement's rows all together or not at
 		 *  all, so a reader never gets part of an observation: the unit a client can rely on is one
-		 *  station at one epoch. Named columns, so an added column cannot break it. */
+		 *  station at one epoch. Named columns, so an added column cannot break it. IGNORE: a value
+		 *  whose (prefix, channel, epoch) is already logged is skipped, not added twice (the unique
+		 *  key on `log`), so a rerun never duplicates a reading. */
 		@JvmStatic
 		fun insertLogRowsSQL2(prefix: String, epoch: Int, values: Map<Int, Any?>): String =
-			"INSERT INTO log (epoch, prefix, channel, value) VALUES " +
+			"INSERT IGNORE INTO log (epoch, prefix, channel, value) VALUES " +
 				values.entries.joinToString(", ") { (sensorID, value) -> "($epoch, '$prefix', $sensorID, $value)" }
 	}
 
@@ -108,7 +110,7 @@ class MeteredDataConnector : Closeable
 	}
 
 	fun insertLogSQL2(stationId: String, dateTime: Int, sensorID: Int, value: Any?): String =
-		"INSERT INTO log VALUES ($dateTime, '$stationId', $sensorID, $value)"
+		"INSERT IGNORE INTO log VALUES ($dateTime, '$stationId', $sensorID, $value)"
 
 	fun emptyLogSQL2(prefix: String, sensorID: Int): String =
 		"DELETE FROM log WHERE prefix='$prefix' AND channel=$sensorID"

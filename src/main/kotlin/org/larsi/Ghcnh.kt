@@ -228,7 +228,7 @@ object Ghcnh
 					md.clearBatch()
 					md.addBatch("DELETE FROM log WHERE $where")
 					for (chunk in observations.chunked(INSERT_CHUNK)) {
-						md.addBatch("INSERT INTO log (epoch, prefix, channel, value) VALUES " + chunk.joinToString(", ") { o ->
+						md.addBatch("INSERT IGNORE INTO log (epoch, prefix, channel, value) VALUES " + chunk.joinToString(", ") { o ->
 							o.values.entries.joinToString(", ") { (channel, v) -> "(${o.epoch}, '$prefix', $channel, $v)" }
 						})
 					}
