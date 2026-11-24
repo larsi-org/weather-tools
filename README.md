@@ -27,22 +27,19 @@ each:
   archive's last one (`java -jar ghcnh.jar download <year | from-to> [prefix ...]`, then
   `java -jar ghcnh.jar load [--dry-run] [<year | from-to>] [prefix ...]`, 2025 to now by default;
   its header comment is the reference).
-- **`Ish2.kt`** (plus `IshHarvester.kt`) — the older importer of NOAA's ISD ("ISH") archive,
-  which ended on 2025-08-28 (GHCNh replaces it). It writes every report type, so a minute with
-  two reports got two rows; don't use it for new loads.
 - **`Zeus.kt`** — a monitoring job that tracks data freshness for both `larsi-sensors` (per-device)
   and `larsi-weather2` (per-station), flagging anything that's stopped reporting, and separately
   alerting if it can't connect to either database at all.
 - **`dev/`** — assorted one-off developer utilities (station-list generation, data export/import,
   etc.).
-- **`util/`** — shared helpers: config loading, a JDBC connection/query helper, psychrometric
-  calculations, and push-notification alerting.
+- **`util/`** — shared helpers: config loading, a JDBC connection/query helper, and
+  push-notification alerting.
 
 ## Sensor IDs
 
 Each stored quantity is identified by a numeric sensor ID:
 
-| Quantity | Measured (GeoNames2/Ish2) |
+| Quantity | Measured (GeoNames2/Ghcnh) |
 |---|---|
 | Temperature | 0 |
 | Dew Point | 1 |
@@ -67,7 +64,7 @@ forecast it) -- see the NDFD2 note above; currently unsupported, so these IDs ar
 mvn clean package
 ```
 
-This produces six runnable jars in `target/`, each bundling the full project plus dependencies:
+This produces four runnable jars in `target/`, each bundling the full project plus dependencies:
 
 | Jar | Runs |
 |---|---|
@@ -75,13 +72,10 @@ This produces six runnable jars in `target/`, each bundling the full project plu
 | `target/ndfd.jar` | `org.larsi.NDFD2` |
 | `target/zeus.jar` | `org.larsi.Zeus` |
 | `target/ghcnh.jar` | `org.larsi.Ghcnh` |
-| `target/ishharvester.jar` | `org.larsi.IshHarvester` |
-| `target/ish2.jar` | `org.larsi.Ish2` |
 
 Run any of them with `java -jar target/<jar>` from a directory containing `credentials.json`
-(`IshHarvester` doesn't need one, since it only downloads files — no DB access). `IshHarvester`
-and `Ish2` are still two separate manual steps (download the archive, then import it), not a
-pipeline — run `IshHarvester` first, then `Ish2` once the archive is on disk.
+(`ghcnh.jar download` doesn't need one, since it only downloads files — no DB access; run it
+before `ghcnh.jar load`, which imports the files on disk).
 
 ## Configuration
 
@@ -109,8 +103,8 @@ Every tool reads a `credentials.json` file from its working directory at startup
 mvn test
 ```
 
-Unit tests cover the pure-logic pieces of this codebase (psychrometric calculations, database
-URL building, and NOAA fixed-width record parsing). Code that talks to a real database, network,
+Unit tests cover the pure-logic pieces of this codebase (GeoNames2's value conversions, GHCNh row
+parsing, and database URL building). Code that talks to a real database, network,
 or file system isn't covered by automated tests.
 
 ## License
@@ -118,7 +112,5 @@ or file system isn't covered by automated tests.
 MIT - see [LICENSE](LICENSE). It covers the original code in this repository. These
 files are not mine to license and stay under their own terms:
 
-- `src/main/kotlin/org/larsi/util/PsychrometricsUtil.kt` - copied from the open-source
-  project SimCon
 - `doc/stations.txt` - station list compiled by Greg Thompson, NCAR/RAP
 - `doc/isd-history.txt` - NOAA Integrated Surface Database station history (US government data)

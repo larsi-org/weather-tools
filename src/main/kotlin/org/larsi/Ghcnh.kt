@@ -18,7 +18,7 @@ import org.larsi.util.WeatherToolsConfig
 
 /**
  * Archived hourly observations from NOAA's GHCNh (Global Historical Climatology Network hourly),
- * the successor of ISD, which ended 2025-08-28 (IshHarvester/Ish2 read ISD).
+ * the successor of ISD, which ended 2025-08-28.
  *
  *   java -jar ghcnh.jar download <year | from-to> [prefix ...]
  *   java -jar ghcnh.jar load [--dry-run] [<year | from-to>] [prefix ...]
@@ -34,20 +34,19 @@ import org.larsi.util.WeatherToolsConfig
  * disk (run download first): channels 0-6 from the year's start up to the file's last METAR are
  * deleted and the file's METARs inserted, so a live GeoNames2 reading stays only where GHCNh has
  * nothing yet (after its last METAR). A file with no METAR deletes nothing. Years default to
- * LOAD_FROM (2025, the year ISD stopped) through the current year; 2024 and before stay as Ish2
- * loaded them. --dry-run prints what would change and writes nothing.
+ * LOAD_FROM (2025, the year ISD stopped) through the current year; 2024 and before stay as the
+ * earlier ISD import loaded them. --dry-run prints what would change and writes nothing.
  *
  * Station id: USW000 + the WBAN part of Icao.usafWban (all 304 are in GHCNh's station list).
  *
  * GHCNh merges every source into one row per timestamp; each value carries its own report type,
  * source and quality code. Only METAR values (report type FM15) are kept, one an hour, the series
- * GeoNames2 stores live (SPECI FM16 and SYNOP FM12, which Ish2 also loaded, are left out; ISD gave
- * those their own records, which is where Ish2's duplicate rows came from). A value is dropped when
+ * GeoNames2 stores live (SPECI FM16 and SYNOP FM12 are left out; the earlier ISD import loaded them too,
+ * as records of their own, which is where 2024-2025's duplicate rows came from). A value is dropped when
  * GHCNh's checks failed it: a letter code (a-z) or a legacy 2, 3, 6 or 7 (suspect or erroneous).
  *
  *   0 temperature (C), 1 dew_point_temperature (C), 2 relative_humidity (%, derived by GHCNh),
- *   3 sea_level_pressure (hPa), 4 wind_direction (degrees; 999 = calm or variable, dropped as in
- *   Ish2), 5 wind_speed (m/s), 6 clouds: the highest sky_cover_summation layer as GeoNames2 codes
+ *   3 sea_level_pressure (hPa), 4 wind_direction (degrees; 999 = calm or variable, dropped), 5 wind_speed (m/s), 6 clouds: the highest sky_cover_summation layer as GeoNames2 codes
  *   it (CLR/SKC 0, FEW 2, SCT 4, BKN 6, OVC and VV 10).
  */
 object Ghcnh
