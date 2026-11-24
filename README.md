@@ -21,9 +21,14 @@ each:
   2026-08-30, since nothing had ever logged to them. Running NDFD2 today would insert predicted
   rows with nowhere to display them; re-enabling it needs those channel entries added back to
   the display layer first (see this repo's `CLAUDE.md` for the exact list).
-- **`Ish2.kt`** (plus `IshHarvester.kt`) — a manual backfill tool that downloads NOAA's
-  historical "ISH" (Integrated Surface Hourly) archive and re-imports it, to patch gaps left by
-  harvester downtime.
+- **`Ghcnh.kt`** — the manual backfill tool: downloads NOAA's GHCNh (Global Historical
+  Climatology Network hourly) station-year files and replaces each station's rows with the
+  archived METARs for everything a file covers, so a live GeoNames2 reading stays only after the
+  archive's last one (`java -jar ghcnh.jar [--dry-run] [--no-download] <year | from-to> [prefix ...]`;
+  its header comment is the reference).
+- **`Ish2.kt`** (plus `IshHarvester.kt`) — the older importer of NOAA's ISD ("ISH") archive,
+  which ended on 2025-08-28 (GHCNh replaces it). It writes every report type, so a minute with
+  two reports got two rows; don't use it for new loads.
 - **`Zeus.kt`** — a monitoring job that tracks data freshness for both `larsi-sensors` (per-device)
   and `larsi-weather2` (per-station), flagging anything that's stopped reporting, and separately
   alerting if it can't connect to either database at all.
@@ -61,13 +66,14 @@ forecast it) -- see the NDFD2 note above; currently unsupported, so these IDs ar
 mvn clean package
 ```
 
-This produces five runnable jars in `target/`, each bundling the full project plus dependencies:
+This produces six runnable jars in `target/`, each bundling the full project plus dependencies:
 
 | Jar | Runs |
 |---|---|
 | `target/geonames.jar` | `org.larsi.GeoNames2` |
 | `target/ndfd.jar` | `org.larsi.NDFD2` |
 | `target/zeus.jar` | `org.larsi.Zeus` |
+| `target/ghcnh.jar` | `org.larsi.Ghcnh` |
 | `target/ishharvester.jar` | `org.larsi.IshHarvester` |
 | `target/ish2.jar` | `org.larsi.Ish2` |
 

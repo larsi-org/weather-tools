@@ -111,7 +111,7 @@
 				</executions>
 			</plugin>
 			<!--
-				One module, one src tree, five runnable fat jars: each execution below
+				One module, one src tree, six runnable fat jars: each execution below
 				shades the whole project (all classes + all dependencies) into its own
 				named jar, differing only in which Main-Class the manifest points at.
 			-->
@@ -176,6 +176,21 @@
 							<transformers>
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
 									<mainClass>org.larsi.Ish2</mainClass>
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+					<execution>
+						<id>ghcnh</id>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<outputFile>${project.build.directory}/ghcnh.jar</outputFile>
+							<transformers>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>org.larsi.Ghcnh</mainClass>
 								</transformer>
 							</transformers>
 						</configuration>
