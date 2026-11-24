@@ -20,16 +20,22 @@ import org.larsi.util.WeatherToolsConfig
  * Archived hourly observations from NOAA's GHCNh (Global Historical Climatology Network hourly),
  * the successor of ISD, which ended 2025-08-28 (IshHarvester/Ish2 read ISD).
  *
- *   java -jar ghcnh.jar [--dry-run] [--no-download] <year | from-to> [prefix ...]
+ *   java -jar ghcnh.jar download <year | from-to> [prefix ...]
+ *   java -jar ghcnh.jar load [--dry-run] [<year | from-to>] [prefix ...]
  *
- * For each year and station (all of Icao, or the prefixes given) it downloads
+ * download: for each year and station (all of Icao, or the prefixes given) fetches
  * https://www.ncei.noaa.gov/oa/global-historical-climatology-network/hourly/access/by-year/<year>/psv/GHCNh_<id>_<year>.psv
- * into WORK_DIRECTORY/ghcnh/<year>/, gzipped (a past year once, the current year every run, since
- * it grows), then replaces the station's rows in `log` for everything the file covers: channels
- * 0-6 from the year's start up to its last METAR are deleted and the file's METARs inserted, so a
- * live GeoNames2 reading stays only where GHCNh has nothing yet (after its last METAR). A file
- * with no METAR deletes nothing. --dry-run prints what would change and writes nothing;
- * --no-download uses the files already on disk.
+ * into WORK_DIRECTORY/ghcnh/<year>/, gzipped. A past year is fetched once (an existing file is
+ * kept), the current year every time, since it grows. A failed download is retried 3 times, then
+ * skipped; the failures are listed at the end, and running the same command again fetches only
+ * what is missing. No database access, so no credentials.json needed.
+ *
+ * load: replaces each station's rows in `log` for everything its file covers, from the files on
+ * disk (run download first): channels 0-6 from the year's start up to the file's last METAR are
+ * deleted and the file's METARs inserted, so a live GeoNames2 reading stays only where GHCNh has
+ * nothing yet (after its last METAR). A file with no METAR deletes nothing. Years default to
+ * LOAD_FROM (2025, the year ISD stopped) through the current year; 2024 and before stay as Ish2
+ * loaded them. --dry-run prints what would change and writes nothing.
  *
  * Station id: USW000 + the WBAN part of Icao.usafWban (all 304 are in GHCNh's station list).
  *
@@ -49,6 +55,7 @@ object Ghcnh
 	private const val BASE = "https://www.ncei.noaa.gov/oa/global-historical-climatology-network/hourly/access/by-year"
 	private const val CHANNELS = "0,1,2,3,4,5,6"
 	private const val INSERT_CHUNK = 2000 // observations per INSERT statement
+	const val LOAD_FROM = 2025
 
 	/** One METAR's values by channel, at its epoch (UTC seconds). */
 	data class Observation(val epoch: Int, val values: Map<Int, String>)
@@ -116,8 +123,9 @@ object Ghcnh
 		return byEpoch.values.toList()
 	}
 
-	/** Downloads one station-year into `file`, gzipped. False when GHCNh has no such file. */
-	private fun download(url: String, file: File): Boolean {
+	/** Downloads one station-year into `file`, gzipped. False when GHCNh has no such file; throws
+	 *  on any other failure (the partial file is removed). */
+	private fun fetch(url: String, file: File): Boolean {
 		val part = File(file.path + ".part")
 		val connection = URL(url).openConnection() as HttpURLConnection
 		connection.connectTimeout = 30_000
@@ -145,37 +153,58 @@ object Ghcnh
 		return (c.timeInMillis / 1000).toInt()
 	}
 
-	@JvmStatic
-	fun main(args: Array<String>) {
-		val dryRun = "--dry-run" in args
-		val noDownload = "--no-download" in args
-		val rest = args.filter { !it.startsWith("--") }
-		if (rest.isEmpty()) {
-			System.err.println("usage: ghcnh.jar [--dry-run] [--no-download] <year | from-to> [prefix ...]")
-			return
-		}
-		val years = rest[0].split('-').map { it.toInt() }.let { if (it.size == 2) it[0]..it[1] else it[0]..it[0] }
-		val wanted = rest.drop(1).map { it.lowercase() }.toSet()
-		val stations = Icao.entries.filter { wanted.isEmpty() || it.name.lowercase() in wanted }
-		val currentYear = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.YEAR)
+	private fun currentYear() = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.YEAR)
 
+	private fun yearRange(arg: String): IntRange =
+		arg.split('-').map { it.toInt() }.let { if (it.size == 2) it[0]..it[1] else it[0]..it[0] }
+
+	private fun stations(prefixes: List<String>): List<Icao> {
+		val wanted = prefixes.map { it.lowercase() }.toSet()
+		val unknown = wanted - Icao.entries.map { it.name.lowercase() }.toSet()
+		require(unknown.isEmpty()) { "unknown station(s): $unknown" }
+		return Icao.entries.filter { wanted.isEmpty() || it.name.lowercase() in wanted }
+	}
+
+	private fun file(year: Int, entry: Icao) =
+		File(WeatherToolsConfig.WORK_DIRECTORY, "ghcnh/$year/GHCNh_${stationId(entry)}_$year.psv.gz")
+
+	fun download(years: IntRange, stations: List<Icao>) {
+		val failed = mutableListOf<String>()
+		var fetched = 0; var kept = 0; var none = 0
 		for (year in years) {
-			val directory = File(WeatherToolsConfig.WORK_DIRECTORY, "ghcnh/$year")
-			directory.mkdirs()
-			println(">>> $year${if (dryRun) " (dry run)" else ""} <<<")
-
+			File(WeatherToolsConfig.WORK_DIRECTORY, "ghcnh/$year").mkdirs()
 			for ((i, entry) in stations.withIndex()) {
-				val prefix = entry.name.lowercase()
-				val id = stationId(entry)
-				val file = File(directory, "GHCNh_${id}_$year.psv.gz")
-				val tag = "${i + 1}/${stations.size} $prefix ($id) $year"
-
-				if (!noDownload && (!file.exists() || year >= currentYear)) {
-					if (!download("$BASE/$year/psv/GHCNh_${id}_$year.psv", file)) {
-						println("$tag: no GHCNh file")
-						continue
+				val file = file(year, entry)
+				val tag = "$year ${i + 1}/${stations.size} ${entry.name.lowercase()} (${stationId(entry)})"
+				if (file.exists() && year < currentYear()) { kept++; continue }
+				val url = "$BASE/$year/psv/GHCNh_${stationId(entry)}_$year.psv"
+				var done = false
+				for (attempt in 1..4) {
+					try {
+						if (fetch(url, file)) { fetched++; println("$tag: ${file.length() / 1024} KB") }
+						else { none++; println("$tag: no GHCNh file") }
+						done = true
+						break
+					} catch (e: Exception) {
+						println("$tag: attempt $attempt failed (${e.message})")
+						Thread.sleep(10_000L * attempt)
 					}
 				}
+				if (!done) failed += "$year ${entry.name.lowercase()}"
+				Thread.sleep(500)
+			}
+		}
+		println("downloaded $fetched, already on disk $kept, not in GHCNh $none, failed ${failed.size}")
+		if (failed.isNotEmpty()) println("failed (run the same command again to retry): ${failed.joinToString(", ")}")
+	}
+
+	fun load(years: IntRange, stations: List<Icao>, dryRun: Boolean) {
+		for (year in years) {
+			println(">>> $year${if (dryRun) " (dry run)" else ""} <<<")
+			for ((i, entry) in stations.withIndex()) {
+				val prefix = entry.name.lowercase()
+				val file = file(year, entry)
+				val tag = "${i + 1}/${stations.size} $prefix (${stationId(entry)}) $year"
 				if (!file.exists()) {
 					println("$tag: not downloaded")
 					continue
@@ -209,6 +238,28 @@ object Ghcnh
 				}
 			}
 			println()
+		}
+	}
+
+	@JvmStatic
+	fun main(args: Array<String>) {
+		val usage = "usage: ghcnh.jar download <year | from-to> [prefix ...]\n" +
+			"       ghcnh.jar load [--dry-run] [<year | from-to>] [prefix ...]"
+		val command = args.firstOrNull()
+		val rest = args.drop(1).filter { !it.startsWith("--") }
+		val hasYears = rest.firstOrNull()?.matches(Regex("""\d{4}(-\d{4})?""")) == true
+		try { when (command) {
+			"download" -> {
+				if (!hasYears) { System.err.println(usage); return }
+				download(yearRange(rest[0]), stations(rest.drop(1)))
+			}
+			"load" -> {
+				val years = if (hasYears) yearRange(rest[0]) else LOAD_FROM..currentYear()
+				load(years, stations(if (hasYears) rest.drop(1) else rest), "--dry-run" in args)
+			}
+			else -> System.err.println(usage)
+		} } catch (e: IllegalArgumentException) {
+			System.err.println(e.message)
 		}
 	}
 }

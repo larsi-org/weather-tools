@@ -24,7 +24,8 @@ each:
 - **`Ghcnh.kt`** — the manual backfill tool: downloads NOAA's GHCNh (Global Historical
   Climatology Network hourly) station-year files and replaces each station's rows with the
   archived METARs for everything a file covers, so a live GeoNames2 reading stays only after the
-  archive's last one (`java -jar ghcnh.jar [--dry-run] [--no-download] <year | from-to> [prefix ...]`;
+  archive's last one (`java -jar ghcnh.jar download <year | from-to> [prefix ...]`, then
+  `java -jar ghcnh.jar load [--dry-run] [<year | from-to>] [prefix ...]`, 2025 to now by default;
   its header comment is the reference).
 - **`Ish2.kt`** (plus `IshHarvester.kt`) — the older importer of NOAA's ISD ("ISH") archive,
   which ended on 2025-08-28 (GHCNh replaces it). It writes every report type, so a minute with
