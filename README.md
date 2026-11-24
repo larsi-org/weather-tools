@@ -16,8 +16,8 @@ each:
   rather than failing silently.
 - **`NDFD2.kt`** — supplements measured observations with
   [NOAA NDFD](https://graphical.weather.gov/) forecast data via SOAP. Written but currently
-  unsupported: the site's display layer (`larsi-org/html`'s `weather/json/sensors.php`,
-  `weather/json/graphs.php`, `weather/report.php`) dropped its predicted-sensor-ID entries as of
+  unsupported: the site's display layer (`larsi-org/html`'s `api/weather/sensors.php`,
+  `api/weather/graphs.php`, `weather/report.php`) dropped its predicted-sensor-ID entries as of
   2026-08-30, since nothing had ever logged to them. Running NDFD2 today would insert predicted
   rows with nowhere to display them; re-enabling it needs those channel entries added back to
   the display layer first (see this repo's `CLAUDE.md` for the exact list).
