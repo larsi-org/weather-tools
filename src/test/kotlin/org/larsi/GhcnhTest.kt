@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test
 
 import org.larsi.util.Icao
 
-/** Covers Ghcnh's pure parsing (station ids, quality codes, clouds, one PSV row); no file,
- *  network or database involved. */
+/** Covers Ghcnh's pure parsing (station ids, quality codes, clouds, one PSV row) and the runs a
+ *  load deletes; no file, network or database involved. */
 class GhcnhTest
 {
 	private val header = listOf(
@@ -93,5 +93,28 @@ class GhcnhTest
 		val o = Ghcnh.parseRow(metar("sea_level_pressure" to "", "dew_point_temperature_Quality_Code" to "s",
 			"relative_humidity_Report_Type" to "FM16"), col)!!
 		assertEquals(setOf(0, 4, 5, 6), o.values.keys)
+	}
+
+	@Test
+	fun hourlyMetarsAreOneRun() {
+		assertEquals(listOf(0..3 * 3600), Ghcnh.runs(listOf(0, 3600, 7200, 3 * 3600)))
+	}
+
+	@Test
+	fun aMissingHourSplitsTheRuns() {
+		// 1:00 missing: 0:00 and 2:00 are 7200 apart, so the hour between keeps what the DB has
+		assertEquals(listOf(0..0, 7200..10800), Ghcnh.runs(listOf(0, 7200, 10800)))
+	}
+
+	@Test
+	fun aSpecialOrLateMetarStaysInTheRun() {
+		// 0:54, 1:30 (FM15 off the usual minute), 2:54: neighbors within MAX_STEP
+		assertEquals(listOf(3240..10440), Ghcnh.runs(listOf(3240, 5400, 10440)))
+	}
+
+	@Test
+	fun noEpochsNoRuns() {
+		assertEquals(emptyList<IntRange>(), Ghcnh.runs(emptyList()))
+		assertEquals(listOf(5..5), Ghcnh.runs(listOf(5)))
 	}
 }

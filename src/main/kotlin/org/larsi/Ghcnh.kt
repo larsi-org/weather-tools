@@ -30,12 +30,16 @@ import org.larsi.util.WeatherToolsConfig
  * skipped; the failures are listed at the end, and running the same command again fetches only
  * what is missing. No database access, so no credentials.json needed.
  *
- * load: replaces each station's rows in `log` for everything its file covers, from the files on
- * disk (run download first): channels 0-6 from the year's start up to the file's last METAR are
- * deleted and the file's METARs inserted, so a live GeoNames2 reading stays only where GHCNh has
- * nothing yet (after its last METAR). A file with no METAR deletes nothing. Years default to
+ * load: replaces each station's rows in `log` with its file's METARs, from the files on disk (run
+ * download first), only where the file has them: the METARs, sorted, split into runs wherever two
+ * neighbors are more than MAX_STEP apart (a missing hour makes a gap), and for each run channels
+ * 0-6 from its first METAR to its last are deleted, then the file's METARs inserted. A gap in the
+ * file (NOAA's 2026-11-09 to 11-12 outage, a late start of the year, anything after its last
+ * METAR) keeps whatever GeoNames2 stored there; GeoNames2 cannot refetch history, so deleting it
+ * would leave the hours empty. A file with no METAR deletes nothing. Years default to
  * LOAD_FROM (2025, the year ISD stopped) through the current year; 2024 and before stay as the
- * earlier ISD import loaded them. --dry-run prints what would change and writes nothing.
+ * earlier ISD import loaded them. --dry-run prints what would change, with the file's gaps of
+ * GAP_LISTED or longer, and writes nothing.
  *
  * Station id: USW000 + the WBAN part of Icao.usafWban (all 304 are in GHCNh's station list).
  *
@@ -55,6 +59,10 @@ object Ghcnh
 	private const val CHANNELS = "0,1,2,3,4,5,6"
 	private const val INSERT_CHUNK = 2000 // observations per INSERT statement
 	const val LOAD_FROM = 2025
+	/** Two METARs further apart than this (seconds) are in different runs: hourly ones are 3600
+	 *  apart, one missing hour makes 7200. */
+	const val MAX_STEP = 5400
+	private const val GAP_LISTED = 3 * 3600 // gaps this long or longer (2 hours without a METAR) are listed in the log
 
 	/** One METAR's values by channel, at its epoch (UTC seconds). */
 	data class Observation(val epoch: Int, val values: Map<Int, String>)
@@ -122,6 +130,27 @@ object Ghcnh
 		return byEpoch.values.toList()
 	}
 
+	/** Sorted epochs as runs of neighbors at most `maxStep` apart, each the range from its first
+	 *  epoch to its last (a lone epoch is a run of its own). */
+	fun runs(epochs: List<Int>, maxStep: Int = MAX_STEP): List<IntRange> {
+		val runs = mutableListOf<IntRange>()
+		var start = 0
+		for (i in 1..epochs.size) {
+			if (i == epochs.size || epochs[i] - epochs[i - 1] > maxStep) {
+				if (epochs.isNotEmpty()) runs += epochs[start]..epochs[i - 1]
+				start = i
+			}
+		}
+		return runs
+	}
+
+	/** `epoch` as "2026-11-09 15:54" UTC, for the log. */
+	private fun utc(epoch: Int): String {
+		val f = SimpleDateFormat("yyyy-MM-dd HH:mm")
+		f.timeZone = TimeZone.getTimeZone("UTC")
+		return f.format(epoch * 1000L)
+	}
+
 	/** Downloads one station-year into `file`, gzipped. False when GHCNh has no such file; throws
 	 *  on any other failure (the partial file is removed). */
 	private fun fetch(url: String, file: File): Boolean {
@@ -143,13 +172,6 @@ object Ghcnh
 			connection.disconnect()
 		}
 		return part.renameTo(file)
-	}
-
-	private fun yearStart(year: Int): Int {
-		val c = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-		c.clear()
-		c.set(year, Calendar.JANUARY, 1)
-		return (c.timeInMillis / 1000).toInt()
 	}
 
 	private fun currentYear() = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.YEAR)
@@ -214,15 +236,20 @@ object Ghcnh
 					println("$tag: no METAR, nothing replaced")
 					continue
 				}
-				val from = yearStart(year)
-				val to = observations.last().epoch
-				val where = "prefix='$prefix' AND channel IN ($CHANNELS) AND epoch >= $from AND epoch <= $to"
+				val runs = runs(observations.map { it.epoch })
+				val ranges = runs.joinToString(" OR ") { "epoch BETWEEN ${it.first} AND ${it.last}" }
+				val where = "prefix='$prefix' AND channel IN ($CHANNELS) AND ($ranges)"
 				val values = observations.sumOf { it.values.size }
+				val gaps = runs.zipWithNext { a, b -> a.last to b.first }
+				val listed = gaps.filter { (from, to) -> to - from >= GAP_LISTED }
+				val span = "${utc(runs.first().first)} to ${utc(runs.last().last)} UTC, ${runs.size} runs, " +
+					"${gaps.size} gaps kept)" + listed.joinToString("") { (from, to) ->
+						"\n    no METAR between ${utc(from)} and ${utc(to)} (${(to - from + 1800) / 3600 - 1} hours)" }
 
 				MeteredDataConnector("larsi-weather2").use { md ->
 					val existing = md.queryList("SELECT COUNT(*) FROM log WHERE $where") { it.getInt(1) }.first()
 					if (dryRun) {
-						println("$tag: would replace $existing rows with $values (${observations.size} METARs, up to epoch $to)")
+						println("$tag: would replace $existing rows with $values (${observations.size} METARs, $span")
 						return@use
 					}
 					md.clearBatch()
@@ -233,7 +260,7 @@ object Ghcnh
 						})
 					}
 					md.executeBatch()
-					println("$tag: replaced $existing rows with $values (${observations.size} METARs, up to epoch $to)")
+					println("$tag: replaced $existing rows with $values (${observations.size} METARs, $span")
 				}
 			}
 			println()
