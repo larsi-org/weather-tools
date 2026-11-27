@@ -18,6 +18,7 @@ import org.larsi.util.Ntfy
  * and NOAA's GHCNh archive read it).
  *
  *   java -jar aviationweather.jar [--dry-run]
+ *   java -jar aviationweather.jar fill [--dry-run] <from> <to> [prefix ...]
  *
  * Jenkins runs it twice an hour. Each run reads every station's last stored reading and stores
  * the METARs after it, so a run missed (Jenkins or the network down) is made up by the next one,
@@ -41,6 +42,12 @@ import org.larsi.util.Ntfy
  * at most 400 reports per answer, a custom User-Agent, only documented query parameters (anything
  * else is HTTP 400), history up to 30 days. No key.
  *
+ * fill: puts AWC's METARs from <from> to <to> (UTC, yyyy-MM-dd or yyyy-MM-ddTHH:mm, within the last
+ * 30 days) into hours the DB has nothing for, for a hole another source left (NOAA's 2026-11-09 to
+ * 11-12 outage): a METAR is written only when the station has no reading (channels 0-6) within
+ * FILL_CLEARANCE of it, so what GHCNh or a harvester stored always stays. `location.last_epoch`
+ * is not touched. All stations, or the prefixes given.
+ *
  * --dry-run fetches and prints what would be stored, and writes nothing.
  */
 object AviationWeather
@@ -54,6 +61,7 @@ object AviationWeather
 	const val MAX_REQUESTS = 90       // per run
 	private const val PAUSE_MS = 1000L
 	private const val CHANNELS = "0,1,2,3,4,5,6"
+	const val FILL_CLEARANCE = 1800   // fill: no METAR within this many seconds of a stored reading
 
 	/** One report as AWC sends it: station, observation time (UTC seconds), METAR or SPECI, raw text. */
 	data class Report(val icao: String, val epoch: Int, val type: String, val raw: String)
@@ -92,19 +100,34 @@ object AviationWeather
 	/** Every report of one station after `last` up to `now`, paging back past AWC's cap: null when
 	 *  the budget ran out before the whole stretch was fetched (nothing of it is to be written). */
 	@JvmStatic
-	fun since(icao: String, last: Int, now: Int, budget: Budget, fetcher: Fetcher): List<Report>? {
-		val from = maxOf(last, now - MAX_HOURS * 3600)
+	fun since(icao: String, last: Int, now: Int, budget: Budget, fetcher: Fetcher): List<Report>? =
+		between(icao, maxOf(last, now - MAX_HOURS * 3600), null, now, budget, fetcher)
+
+	/** Every report of one station from `from` to `to` (null: now), paging back past AWC's cap;
+	 *  null when the budget ran out first. */
+	@JvmStatic
+	fun between(icao: String, from: Int, to: Int?, now: Int, budget: Budget, fetcher: Fetcher): List<Report>? {
 		val reports = mutableListOf<Report>()
-		var end: Int? = null
+		var end: Int? = to
 		while (true) {
 			if (budget.left <= 0) return null
 			budget.left--
 			val page = fetcher.fetch(listOf(icao), hoursBetween(from, end ?: now), end)
 			reports += page
-			if (page.size < MAX_REPORTS) return reports
+			if (page.size < MAX_REPORTS) return reports.filter { it.epoch >= from }
 			val oldest = page.minOf { it.epoch }
-			if (oldest <= from || (end != null && oldest >= end)) return reports
+			if (oldest <= from || (end != null && oldest >= end)) return reports.filter { it.epoch >= from }
 			end = oldest
+		}
+	}
+
+	/** The METARs of `metars` with no epoch of `stored` within FILL_CLEARANCE of them. */
+	@JvmStatic
+	fun uncovered(metars: List<Report>, stored: List<Int>): List<Report> {
+		val sorted = stored.sorted()
+		return metars.filter { m ->
+			val i = sorted.binarySearch(m.epoch - FILL_CLEARANCE).let { if (it < 0) -it - 1 else it }
+			i >= sorted.size || sorted[i] > m.epoch + FILL_CLEARANCE
 		}
 	}
 
@@ -241,9 +264,70 @@ object AviationWeather
 		}
 	}
 
+	private fun parseTime(s: String): Int {
+		val f = SimpleDateFormat(if (s.length > 10) "yyyy-MM-dd'T'HH:mm" else "yyyy-MM-dd")
+		f.timeZone = TimeZone.getTimeZone("UTC")
+		f.isLenient = false
+		return (f.parse(s).time / 1000).toInt()
+	}
+
+	@JvmStatic
+	fun fill(from: Int, to: Int, only: List<String>, dryRun: Boolean, fetcher: Fetcher = Http) {
+		val now = (System.currentTimeMillis() / 1000).toInt()
+		require(from < to) { "fill: <from> must be before <to>" }
+		require(from > now - MAX_HOURS * 3600) { "fill: AWC keeps 30 days, ${utc(from)} is older" }
+		val budget = Budget(Int.MAX_VALUE)
+		var added = 0; var skipped = 0
+		MeteredDataConnector("larsi-weather2").use { md ->
+			val all = md.queryList("SELECT prefix FROM location;") { it.getString(1) }
+			val unknown = only.map { it.lowercase() } - all.toSet()
+			require(unknown.isEmpty()) { "unknown station(s): $unknown" }
+			val prefixes = if (only.isEmpty()) all else all.filter { it in only.map { o -> o.lowercase() } }
+			println("fill ${utc(from)} to ${utc(to)} UTC${if (dryRun) " (dry run)" else ""}")
+			for ((i, prefix) in prefixes.withIndex()) {
+				val header = "${String.format("%4s", i + 1)} / ${String.format("%4s", prefixes.size)} - ${prefix.uppercase()}:"
+				try {
+					val metars = newMetars(between(prefix.uppercase(), from, to, now, budget, fetcher)!!, prefix.uppercase(), from - 1)
+						.filter { it.epoch <= to }
+					val stored = md.queryList("SELECT DISTINCT epoch FROM log WHERE prefix='$prefix' AND channel IN ($CHANNELS) " +
+						"AND epoch BETWEEN ${from - FILL_CLEARANCE} AND ${to + FILL_CLEARANCE}") { it.getInt(1) }
+					val rows = uncovered(metars, stored).map { it.epoch to Metar.parse(it.raw) }.filter { it.second.isNotEmpty() }
+					skipped += metars.size - rows.size
+					if (rows.isEmpty()) {
+						println("$header nothing to fill (${metars.size} METARs at AWC, all near a stored reading)")
+						continue
+					}
+					val span = "${utc(rows.first().first)} to ${utc(rows.last().first)} UTC"
+					if (!dryRun) {
+						md.clearBatch()
+						for ((epoch, values) in rows) md.addBatch(MeteredDataConnector.insertLogRowsSQL2(prefix, epoch, values))
+						md.executeBatch()
+					}
+					added += rows.size
+					println("$header ${if (dryRun) "would fill" else "filled"} ${rows.size} of ${metars.size} METARs ($span)")
+				} catch (e: Exception) {
+					println("$header request failed (${e.message})")
+				}
+			}
+		}
+		println("${if (dryRun) "would fill" else "filled"} $added METARs, $skipped left out next to a stored reading, ${Int.MAX_VALUE - budget.left} requests")
+	}
+
 	@JvmStatic
 	fun main(args: Array<String>) {
-		check("--dry-run" in args)
+		val dryRun = "--dry-run" in args
+		val rest = args.filter { !it.startsWith("--") }
+		try {
+			if (rest.firstOrNull() == "fill") {
+				if (rest.size < 3) { System.err.println("usage: aviationweather.jar fill [--dry-run] <from> <to> [prefix ...]"); return }
+				fill(parseTime(rest[1]), parseTime(rest[2]), rest.drop(3), dryRun)
+			} else {
+				check(dryRun)
+			}
+		} catch (e: IllegalArgumentException) {
+			System.err.println(e.message)
+			return
+		}
 		println("Done")
 	}
 }

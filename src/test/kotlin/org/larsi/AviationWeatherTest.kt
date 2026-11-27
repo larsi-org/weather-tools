@@ -99,4 +99,22 @@ class AviationWeatherTest
 		assertEquals(1200, r.size)
 		assertEquals(listOf(200, 100, 50, 50, 100, 50, 50), awc.requests.map { it.first.size })
 	}
+
+	@Test
+	fun `between fetches a past stretch, paging back from its end`() {
+		val awc = FakeAwc(station("KROC", 720), now)
+		val from = now - 400 * 3600; val to = now - 100 * 3600
+		val r = AviationWeather.between("KROC", from, to, now, AviationWeather.Budget(10), awc)!!
+		assertEquals(to, awc.requests[0].third)
+		assertEquals(300, AviationWeather.newMetars(r, "KROC", from - 1).size)   // every hour from..to
+		assertEquals(true, r.all { it.epoch in from..to })
+	}
+
+	@Test
+	fun `uncovered leaves out METARs within 30 minutes of a stored reading`() {
+		val m = listOf(10_000, 20_000, 30_000, 40_000).map { Report("KROC", it, "METAR", "") }
+		val stored = listOf(20_000 + 1800, 30_000 - 1801, 50_000)   // 20,000 covered at the edge, 30,000 not
+		assertEquals(listOf(10_000, 30_000, 40_000), AviationWeather.uncovered(m, stored).map { it.epoch })
+		assertEquals(4, AviationWeather.uncovered(m, emptyList()).size)
+	}
 }
