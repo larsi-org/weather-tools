@@ -14,6 +14,11 @@ each:
   station, and stores them in MySQL (`larsi-weather2`). This is the live, currently-deployed data
   source. If it can't reach the database at all, it pushes its own alert (see `Zeus.kt` below)
   rather than failing silently.
+- **`AviationWeather.kt`** — the same METAR-derived observations from NOAA's
+  [Aviation Weather Center](https://aviationweather.gov/data/api/) data API, written to replace
+  GeoNames2: a few requests per run for all stations, only the routine hourly METARs, and a
+  catch-up that fills everything after each station's last reading, up to 30 days back, after a
+  missed run (`java -jar aviationweather.jar [--dry-run]`; its header comment is the reference).
 - **`NDFD2.kt`** — supplements measured observations with
   [NOAA NDFD](https://graphical.weather.gov/) forecast data via SOAP. Written but currently
   unsupported: the site's display layer (`larsi-org/html`'s `api/weather/sensors.php`,
@@ -23,8 +28,8 @@ each:
   the display layer first (see this repo's `CLAUDE.md` for the exact list).
 - **`Ghcnh.kt`** — the manual backfill tool: downloads NOAA's GHCNh (Global Historical
   Climatology Network hourly) station-year files and replaces each station's rows with the
-  archived METARs for everything a file covers, so a live GeoNames2 reading stays only after the
-  archive's last one (`java -jar ghcnh.jar download <year | from-to> [prefix ...]`, then
+  archived METARs wherever the file has them, so a live reading stays after the archive's last
+  one and in the archive's own gaps (`java -jar ghcnh.jar download <year | from-to> [prefix ...]`, then
   `java -jar ghcnh.jar load [--dry-run] [<year | from-to>] [prefix ...]`, 2025 to now by default;
   its header comment is the reference).
 - **`Zeus.kt`** — a monitoring job that tracks data freshness for both `larsi-sensors` (per-device)
@@ -64,7 +69,7 @@ forecast it) -- see the NDFD2 note above; currently unsupported, so these IDs ar
 mvn clean package
 ```
 
-This produces four runnable jars in `target/`, each bundling the full project plus dependencies:
+This produces five runnable jars in `target/`, each bundling the full project plus dependencies:
 
 | Jar | Runs |
 |---|---|
@@ -72,6 +77,7 @@ This produces four runnable jars in `target/`, each bundling the full project pl
 | `target/ndfd.jar` | `org.larsi.NDFD2` |
 | `target/zeus.jar` | `org.larsi.Zeus` |
 | `target/ghcnh.jar` | `org.larsi.Ghcnh` |
+| `target/aviationweather.jar` | `org.larsi.AviationWeather` |
 
 Run any of them with `java -jar target/<jar>` from a directory containing `credentials.json`
 (`ghcnh.jar download` doesn't need one, since it only downloads files — no DB access; run it
@@ -103,8 +109,8 @@ Every tool reads a `credentials.json` file from its working directory at startup
 mvn test
 ```
 
-Unit tests cover the pure-logic pieces of this codebase (GeoNames2's value conversions, GHCNh row
-parsing, and database URL building). Code that talks to a real database, network,
+Unit tests cover the pure-logic pieces of this codebase (METAR parsing, GeoNames2's and AWC's
+responses, AWC's paging, GHCNh row parsing and runs, and database URL building). Code that talks to a real database, network,
 or file system isn't covered by automated tests.
 
 ## License
