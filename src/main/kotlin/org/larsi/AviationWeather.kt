@@ -46,7 +46,8 @@ import org.larsi.util.Ntfy
  * 30 days) into hours the DB has nothing for, for a hole another source left (NOAA's 2026-11-09 to
  * 11-12 outage): a METAR is written only when the station has no reading (channels 0-6) within
  * FILL_CLEARANCE of it, so what GHCNh or a harvester stored always stays. `location.last_epoch`
- * is not touched. All stations, or the prefixes given.
+ * (what the site's station health reads) moves up to the newest METAR filled, never back. All
+ * stations, or the prefixes given.
  *
  * --dry-run fetches and prints what would be stored, and writes nothing.
  */
@@ -295,6 +296,10 @@ object AviationWeather
 	 *  the oldest page's `date` is never refused. */
 	fun daysBack(days: Int, now: Int): Int = maxOf(now - days * 86400, now - MAX_HOURS * 3600 + 3600)
 
+	/** Moves `location.last_epoch` up to `epoch`, never back (NULL counts as nothing stored). */
+	fun raiseLastEpochSQL(prefix: String, epoch: Int): String =
+		"UPDATE location SET last_epoch=GREATEST(COALESCE(last_epoch, 0), $epoch) WHERE prefix='$prefix'"
+
 	@JvmStatic
 	fun fill(from: Int, to: Int, only: List<String>, dryRun: Boolean, fetcher: Fetcher = Http) {
 		val now = (System.currentTimeMillis() / 1000).toInt()
@@ -327,6 +332,7 @@ object AviationWeather
 					if (!dryRun) {
 						md.clearBatch()
 						for ((epoch, values) in rows) md.addBatch(MeteredDataConnector.insertLogRowsSQL2(prefix, epoch, values))
+						md.addBatch(raiseLastEpochSQL(prefix, rows.last().first))
 						md.executeBatch()
 					}
 					added += rows.size

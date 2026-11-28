@@ -143,4 +143,10 @@ class AviationWeatherTest
 		val m = listOf(15, 35).map { Report("KLAM", h + it * 60, "METAR", "") }
 		assertEquals(listOf(h + 35 * 60), AviationWeather.hourly(m).map { it.epoch })            // an hour not over: its latest so far
 	}
+
+	@Test
+	fun `fill raises last_epoch and never lowers it`() {
+		assertEquals("UPDATE location SET last_epoch=GREATEST(COALESCE(last_epoch, 0), 1794000000) WHERE prefix='kdpg'",
+			AviationWeather.raiseLastEpochSQL("kdpg", 1794000000))
+	}
 }
