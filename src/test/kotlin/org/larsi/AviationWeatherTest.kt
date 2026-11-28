@@ -123,4 +123,14 @@ class AviationWeatherTest
 		assertEquals(now - 7 * 86400, AviationWeather.daysBack(7, now))
 		assertEquals(now - 720 * 3600 + 3600, AviationWeather.daysBack(30, now))
 	}
+
+	@Test
+	fun `hourly keeps each hour's latest METAR once the hour is over`() {
+		val h = 1_800_000_000 / 3600 * 3600   // a full hour
+		val m = listOf(15, 35, 55).map { Report("KLAM", h + it * 60, "METAR", "") } +   // every 20 minutes
+			listOf(Report("KLAM", h + 3600 + 45 * 60, "METAR", "")) +                    // one at :45
+			listOf(15, 35).map { Report("KLAM", h + 7200 + it * 60, "METAR", "") }       // an hour not over yet
+		assertEquals(listOf(h + 55 * 60, h + 3600 + 45 * 60), AviationWeather.hourly(m, h + 7200 + 40 * 60).map { it.epoch })
+		assertEquals(listOf(h + 55 * 60, h + 3600 + 45 * 60, h + 7200 + 35 * 60), AviationWeather.hourly(m, h + 3 * 3600).map { it.epoch })
+	}
 }

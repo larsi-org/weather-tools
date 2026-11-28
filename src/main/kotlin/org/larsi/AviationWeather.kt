@@ -95,6 +95,16 @@ object AviationWeather
 		reports.filter { it.icao == icao && it.type == "METAR" && it.epoch > after }
 			.distinctBy { it.epoch }.sortedBy { it.epoch }
 
+	/** One METAR per clock hour (UTC), the hour's latest, and only for hours over by `until`. Most
+	 *  stations send one routine METAR an hour (:51-:59); some automated ones (KLAM, KPNA, KANE at
+	 *  night) send one every 20 minutes, :15, :35 and :55, and the :55 one is the hourly report (the
+	 *  one with the 3-hour pressure tendency). Waiting for the hour to end keeps a run at :45 from
+	 *  storing the :15 or :35 one before the :55 one exists. Input oldest first, output too. */
+	@JvmStatic
+	fun hourly(metars: List<Report>, until: Int): List<Report> =
+		metars.groupBy { it.epoch / 3600 }.filterKeys { (it + 1) * 3600 <= until }.values.map { h -> h.maxBy { it.epoch } }
+			.sortedBy { it.epoch }
+
 	private fun hoursBetween(from: Int, to: Int): Int = minOf(MAX_HOURS, (to - from + 3599) / 3600 + 1)
 
 	/** Every report of one station after `last` up to `now`, paging back past AWC's cap: null when
@@ -222,7 +232,7 @@ object AviationWeather
 					val before = budget.left
 					try {
 						val reports = group(chunk.map { it.uppercase() }, RECENT_HOURS + 1, budget, fetcher)
-						for (prefix in chunk) store(prefix, newMetars(reports, prefix.uppercase(), last.getValue(prefix)), "")
+						for (prefix in chunk) store(prefix, hourly(newMetars(reports, prefix.uppercase(), last.getValue(prefix)), now), "")
 					} catch (e: Exception) {
 						failed++
 						firstError = firstError ?: e.message
@@ -239,7 +249,7 @@ object AviationWeather
 					val before = budget.left
 					try {
 						val reports = since(prefix.uppercase(), last.getValue(prefix), now, budget, fetcher)
-						val metars = reports?.let { newMetars(it, prefix.uppercase(), last.getValue(prefix)) }
+						val metars = reports?.let { hourly(newMetars(it, prefix.uppercase(), last.getValue(prefix)), now) }
 						if (metars == null) println("$header behind, $since: left for the next run (request budget used up)")
 						else if (metars.isEmpty()) println("$header behind, $since: AWC has no newer METAR")
 						else store(prefix, metars, ", behind $since, ${before - budget.left} request${if (before - budget.left > 1) "s" else ""}")
@@ -291,8 +301,8 @@ object AviationWeather
 			for ((i, prefix) in prefixes.withIndex()) {
 				val header = "${String.format("%4s", i + 1)} / ${String.format("%4s", prefixes.size)} - ${prefix.uppercase()}:"
 				try {
-					val metars = newMetars(between(prefix.uppercase(), from, to, now, budget, fetcher)!!, prefix.uppercase(), from - 1)
-						.filter { it.epoch <= to }
+					val metars = hourly(newMetars(between(prefix.uppercase(), from, to, now, budget, fetcher)!!, prefix.uppercase(), from - 1)
+						.filter { it.epoch <= to }, minOf(to, now))
 					val stored = md.queryList("SELECT DISTINCT epoch FROM log WHERE prefix='$prefix' AND channel IN ($CHANNELS) " +
 						"AND epoch BETWEEN ${from - FILL_CLEARANCE} AND ${to + FILL_CLEARANCE}") { it.getInt(1) }
 					val rows = uncovered(metars, stored).map { it.epoch to Metar.parse(it.raw) }.filter { it.second.isNotEmpty() }
