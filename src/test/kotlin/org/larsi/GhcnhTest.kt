@@ -117,4 +117,14 @@ class GhcnhTest
 		assertEquals(emptyList<IntRange>(), Ghcnh.runs(emptyList()))
 		assertEquals(listOf(5..5), Ghcnh.runs(listOf(5)))
 	}
+
+	@Test
+	fun `hourly keeps the hour's latest METAR, or the station's own minute`() {
+		val h = 1_800_000_000 / 3600 * 3600
+		fun o(min: Int, hour: Int = 0) = Ghcnh.Observation(h + hour * 3600 + min * 60, emptyMap())
+		val twenty = listOf(o(15), o(35), o(55), o(48, 1), o(53, 1))   // 20-minute METARs; an extra before :53
+		assertEquals(listOf(o(55), o(53, 1)), Ghcnh.hourly(twenty))
+		val kcys = listOf(o(53), o(55), o(55, 1))                       // second instrument at :55
+		assertEquals(listOf(o(53), o(55, 1)), Ghcnh.hourly(kcys, 53))   // :53 when the hour has it
+	}
 }

@@ -44,8 +44,8 @@ import org.larsi.util.WeatherToolsConfig
  * Station id: USW000 + the WBAN part of Icao.usafWban (all 304 are in GHCNh's station list).
  *
  * GHCNh merges every source into one row per timestamp; each value carries its own report type,
- * source and quality code. Only METAR values (report type FM15) are kept, one an hour, the series
- * GeoNames2 stores live (SPECI FM16 and SYNOP FM12 are left out; the earlier ISD import loaded them too,
+ * source and quality code. Only METAR values (report type FM15) are kept, one an hour (`hourly`), the series
+ * AviationWeather stores live (SPECI FM16 and SYNOP FM12 are left out; the earlier ISD import loaded them too,
  * as records of their own, which is where 2024-2025's duplicate rows came from). A value is dropped when
  * GHCNh's checks failed it: a letter code (a-z) or a legacy 2, 3, 6 or 7 (suspect or erroneous).
  *
@@ -129,6 +129,22 @@ object Ghcnh
 		}
 		return byEpoch.values.toList()
 	}
+
+	/** Stations whose file has a second instrument's METARs in most hours, at a fixed minute next to
+	 *  the station's own: the own METAR's minute, kept when the hour has it. KCYS: :53 and :55 in
+	 *  every hour with clearly different values (2026-06-10 10:53 10.6 C, wind 280; 10:55 7.9 C,
+	 *  calm); AWC has only the :53 one. */
+	val OWN_MINUTE = mapOf("kcys" to 53)
+
+	/** One METAR per clock hour (UTC), the rule AviationWeather stores by: the hour's latest, or the
+	 *  one at `ownMinute` when the hour has it. NOAA's files keep every routine METAR: the 20-minute
+	 *  stations' :15, :35 and :55 (KLAM, KPNA, KOUN and others, some only at times), and extra
+	 *  reports before the routine one (:00, :45-:51 before a :53); in 2026 87,661 METARs more than
+	 *  station-hours, in 2025 128,607. Input sorted, output too. */
+	fun hourly(observations: List<Observation>, ownMinute: Int? = null): List<Observation> =
+		observations.groupBy { it.epoch / 3600 }.values.map { h ->
+			ownMinute?.let { m -> h.lastOrNull { it.epoch / 60 % 60 == m } } ?: h.last()
+		}.sortedBy { it.epoch }
 
 	/** Sorted epochs as runs of neighbors at most `maxStep` apart, each the range from its first
 	 *  epoch to its last (a lone epoch is a run of its own). */
@@ -231,12 +247,15 @@ object Ghcnh
 					continue
 				}
 
-				val observations = readFile(file)
+				val all = readFile(file)
+				val observations = hourly(all, OWN_MINUTE[prefix])
 				if (observations.isEmpty()) {
 					println("$tag: no METAR, nothing replaced")
 					continue
 				}
-				val runs = runs(observations.map { it.epoch })
+				// runs from every METAR in the file, so the hours it covers are replaced in full,
+				// the METARs `hourly` leaves out included
+				val runs = runs(all.map { it.epoch })
 				val ranges = runs.joinToString(" OR ") { "epoch BETWEEN ${it.first} AND ${it.last}" }
 				val where = "prefix='$prefix' AND channel IN ($CHANNELS) AND ($ranges)"
 				val values = observations.sumOf { it.values.size }
