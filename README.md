@@ -19,6 +19,7 @@ each:
   GeoNames2: a few requests per run for all stations, only the routine hourly METARs, and a
   catch-up that fills everything after each station's last reading, up to 30 days back, after a
   missed run (`java -jar aviationweather.jar [--dry-run]`; its header comment is the reference).
+  `fill --days 30` finds and fills holes before the last reading too (meant as a daily job).
 - **`NDFD2.kt`** — supplements measured observations with
   [NOAA NDFD](https://graphical.weather.gov/) forecast data via SOAP. Written but currently
   unsupported: the site's display layer (`larsi-org/html`'s `api/weather/sensors.php`,

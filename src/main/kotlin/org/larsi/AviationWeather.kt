@@ -271,6 +271,10 @@ object AviationWeather
 		return (f.parse(s).time / 1000).toInt()
 	}
 
+	/** The start of `fill --days n`: n days before now, but at least an hour inside AWC's 30 days, so
+	 *  the oldest page's `date` is never refused. */
+	fun daysBack(days: Int, now: Int): Int = maxOf(now - days * 86400, now - MAX_HOURS * 3600 + 3600)
+
 	@JvmStatic
 	fun fill(from: Int, to: Int, only: List<String>, dryRun: Boolean, fetcher: Fetcher = Http) {
 		val now = (System.currentTimeMillis() / 1000).toInt()
@@ -297,7 +301,9 @@ object AviationWeather
 						println("$header nothing to fill (${metars.size} METARs at AWC, all near a stored reading)")
 						continue
 					}
-					val span = "${utc(rows.first().first)} to ${utc(rows.last().first)} UTC"
+					val holes = Ghcnh.runs(rows.map { it.first }).joinToString(", ") {
+						if (it.first == it.last) utc(it.first) else "${utc(it.first)} to ${utc(it.last)}" }
+					val span = "$holes UTC"
 					if (!dryRun) {
 						md.clearBatch()
 						for ((epoch, values) in rows) md.addBatch(MeteredDataConnector.insertLogRowsSQL2(prefix, epoch, values))
@@ -318,8 +324,14 @@ object AviationWeather
 		val dryRun = "--dry-run" in args
 		val rest = args.filter { !it.startsWith("--") }
 		try {
-			if (rest.firstOrNull() == "fill") {
-				if (rest.size < 3) { System.err.println("usage: aviationweather.jar fill [--dry-run] <from> <to> [prefix ...]"); return }
+			if (rest.firstOrNull() == "fill" && "--days" in args) {
+				val days = args.getOrNull(args.indexOf("--days") + 1)?.toIntOrNull()
+				require(days != null && days in 1..MAX_HOURS / 24) { "fill --days takes 1 to ${MAX_HOURS / 24}" }
+				val now = (System.currentTimeMillis() / 1000).toInt()
+				fill(daysBack(days, now), now, rest.drop(1) - days.toString(), dryRun)
+			} else if (rest.firstOrNull() == "fill") {
+				if (rest.size < 3) { System.err.println("usage: aviationweather.jar fill [--dry-run] <from> <to> [prefix ...]\n" +
+					"       aviationweather.jar fill [--dry-run] --days <n> [prefix ...]"); return }
 				fill(parseTime(rest[1]), parseTime(rest[2]), rest.drop(3), dryRun)
 			} else {
 				check(dryRun)

@@ -117,4 +117,10 @@ class AviationWeatherTest
 		assertEquals(listOf(10_000, 30_000, 40_000), AviationWeather.uncovered(m, stored).map { it.epoch })
 		assertEquals(4, AviationWeather.uncovered(m, emptyList()).size)
 	}
+
+	@Test
+	fun `daysBack stays an hour inside AWC's 30 days`() {
+		assertEquals(now - 7 * 86400, AviationWeather.daysBack(7, now))
+		assertEquals(now - 720 * 3600 + 3600, AviationWeather.daysBack(30, now))
+	}
 }
