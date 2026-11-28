@@ -133,4 +133,14 @@ class AviationWeatherTest
 		assertEquals(listOf(h + 55 * 60, h + 3600 + 45 * 60), AviationWeather.hourly(m, h + 7200 + 40 * 60).map { it.epoch })
 		assertEquals(listOf(h + 55 * 60, h + 3600 + 45 * 60, h + 7200 + 35 * 60), AviationWeather.hourly(m, h + 3 * 3600).map { it.epoch })
 	}
+
+	@Test
+	fun `a later METAR of the hour replaces the readings stored earlier in it`() {
+		val h = 1_800_000_000 / 3600 * 3600
+		assertEquals((h until h + 55 * 60), AviationWeather.replaced(h + 15 * 60, h + 55 * 60))   // :55 after :15
+		assertNull(AviationWeather.replaced(h - 5 * 60, h + 55 * 60))                             // the hour before
+		assertNull(AviationWeather.replaced(0, h + 55 * 60))                                      // nothing stored
+		val m = listOf(15, 35).map { Report("KLAM", h + it * 60, "METAR", "") }
+		assertEquals(listOf(h + 35 * 60), AviationWeather.hourly(m).map { it.epoch })            // an hour not over: its latest so far
+	}
 }

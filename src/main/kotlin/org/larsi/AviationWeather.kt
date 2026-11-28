@@ -95,15 +95,22 @@ object AviationWeather
 		reports.filter { it.icao == icao && it.type == "METAR" && it.epoch > after }
 			.distinctBy { it.epoch }.sortedBy { it.epoch }
 
-	/** One METAR per clock hour (UTC), the hour's latest, and only for hours over by `until`. Most
-	 *  stations send one routine METAR an hour (:51-:59); some automated ones (KLAM, KPNA, KANE at
-	 *  night) send one every 20 minutes, :15, :35 and :55, and the :55 one is the hourly report (the
-	 *  one with the 3-hour pressure tendency). Waiting for the hour to end keeps a run at :45 from
-	 *  storing the :15 or :35 one before the :55 one exists. Input oldest first, output too. */
+	/** One METAR per clock hour (UTC), the hour's latest, and only for hours over by `until` (null:
+	 *  every hour). Most stations send one routine METAR an hour (:51-:59); some automated ones (KLAM,
+	 *  KPNA, KANE at night) send one every 20 minutes, :15, :35 and :55, and the :55 one is the hourly
+	 *  report (the one with the 3-hour pressure tendency). Input oldest first, output too. */
 	@JvmStatic
-	fun hourly(metars: List<Report>, until: Int): List<Report> =
-		metars.groupBy { it.epoch / 3600 }.filterKeys { (it + 1) * 3600 <= until }.values.map { h -> h.maxBy { it.epoch } }
-			.sortedBy { it.epoch }
+	fun hourly(metars: List<Report>, until: Int? = null): List<Report> =
+		metars.groupBy { it.epoch / 3600 }.filterKeys { until == null || (it + 1) * 3600 <= until }.values
+			.map { h -> h.maxBy { it.epoch } }.sortedBy { it.epoch }
+
+	/** The normal run stores an hour's latest METAR as soon as AWC has it, so a later METAR of the
+	 *  same hour (KLAM's :35 or :55 after its :15, or a :55 that reached AWC late) can come after
+	 *  the station's last reading `last`. It replaces the readings stored earlier in that hour: the
+	 *  stretch to delete, or null when `first` (the oldest METAR to store) starts a new hour. */
+	@JvmStatic
+	fun replaced(last: Int, first: Int): IntRange? =
+		if (last > 0 && last < first && last / 3600 == first / 3600) (first / 3600 * 3600) until first else null
 
 	private fun hoursBetween(from: Int, to: Int): Int = minOf(MAX_HOURS, (to - from + 3599) / 3600 + 1)
 
@@ -215,15 +222,18 @@ object AviationWeather
 						return
 					}
 					val span = "${utc(rows.first().first)}" + (if (rows.size > 1) " to ${utc(rows.last().first)}" else "") + " UTC"
+					val gone = replaced(last.getValue(prefix), rows.first().first)
+					val replacing = gone?.let { ", replacing the reading of ${utc(last.getValue(prefix))} UTC" } ?: ""
 					if (dryRun) {
-						println("$header would add ${rows.size} METAR${if (rows.size > 1) "s" else ""} ($span)$note")
+						println("$header would add ${rows.size} METAR${if (rows.size > 1) "s" else ""} ($span)$replacing$note")
 						return
 					}
 					md.clearBatch()
+					if (gone != null) md.addBatch("DELETE FROM log WHERE prefix='$prefix' AND channel IN ($CHANNELS) AND epoch BETWEEN ${gone.first} AND ${gone.last}")
 					for ((epoch, values) in rows) md.addBatch(MeteredDataConnector.insertLogRowsSQL2(prefix, epoch, values))
 					md.executeBatch()
 					md.executeUpdate(md.updateLastEpochSQL2(prefix, rows.last().first))
-					println("$header added ${rows.size} METAR${if (rows.size > 1) "s" else ""} ($span)$note")
+					println("$header added ${rows.size} METAR${if (rows.size > 1) "s" else ""} ($span)$replacing$note")
 				}
 
 				// stations stored recently: asked for together
@@ -232,7 +242,7 @@ object AviationWeather
 					val before = budget.left
 					try {
 						val reports = group(chunk.map { it.uppercase() }, RECENT_HOURS + 1, budget, fetcher)
-						for (prefix in chunk) store(prefix, hourly(newMetars(reports, prefix.uppercase(), last.getValue(prefix)), now), "")
+						for (prefix in chunk) store(prefix, hourly(newMetars(reports, prefix.uppercase(), last.getValue(prefix))), "")
 					} catch (e: Exception) {
 						failed++
 						firstError = firstError ?: e.message
@@ -249,7 +259,7 @@ object AviationWeather
 					val before = budget.left
 					try {
 						val reports = since(prefix.uppercase(), last.getValue(prefix), now, budget, fetcher)
-						val metars = reports?.let { hourly(newMetars(it, prefix.uppercase(), last.getValue(prefix)), now) }
+						val metars = reports?.let { hourly(newMetars(it, prefix.uppercase(), last.getValue(prefix))) }
 						if (metars == null) println("$header behind, $since: left for the next run (request budget used up)")
 						else if (metars.isEmpty()) println("$header behind, $since: AWC has no newer METAR")
 						else store(prefix, metars, ", behind $since, ${before - budget.left} request${if (before - budget.left > 1) "s" else ""}")
